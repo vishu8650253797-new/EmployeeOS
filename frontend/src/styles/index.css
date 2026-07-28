@@ -1,0 +1,123 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  --color-brand-50: #eef4ff;
+  --color-brand-100: #dce7fd;
+  --color-brand-200: #c0d4fc;
+  --color-brand-300: #94b8fa;
+  --color-brand-400: #6191f5;
+  --color-brand-500: #3d6cef;
+  --color-brand-600: #274de4;
+  --color-brand-700: #1f3ad1;
+  --color-brand-800: #2032a9;
+  --color-brand-900: #1f2f85;
+  --color-brand-950: #171f51;
+
+  --color-surface: #ffffff;
+  --color-canvas: #f8f9fb;
+  --color-ink-900: #101828;
+  --color-ink-700: #344054;
+  --color-ink-500: #667085;
+  --color-ink-400: #98a2b3;
+  --color-line: #e4e7ec;
+  --color-line-strong: #d0d5dd;
+
+  --color-success-50: #ecfdf3;
+  --color-success-600: #079455;
+  --color-success-700: #067647;
+  --color-warning-50: #fffaeb;
+  --color-warning-600: #dc6803;
+  --color-warning-700: #b54708;
+  --color-danger-50: #fef3f2;
+  --color-danger-600: #d92d20;
+  --color-danger-700: #b42318;
+  --color-info-50: #eff8ff;
+  --color-info-600: #1570ef;
+  --color-info-700: #175cd3;
+
+  --shadow-card: 0 1px 2px 0 rgb(16 24 40 / 0.05);
+  --shadow-card-md: 0 1px 3px 0 rgb(16 24 40 / 0.08), 0 1px 2px -1px rgb(16 24 40 / 0.06);
+  --shadow-pop: 0 12px 24px -6px rgb(16 24 40 / 0.12), 0 4px 8px -4px rgb(16 24 40 / 0.06);
+  --shadow-modal: 0 20px 40px -8px rgb(16 24 40 / 0.18), 0 8px 16px -8px rgb(16 24 40 / 0.1);
+}
+
+html {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-ink-900);
+  font-size: 0.875rem;
+}
+
+::selection {
+  background: var(--color-brand-100);
+}
+
+/* Scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: 9999px;
+}
+
+/* Focus ring */
+.focus-ring {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-1;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.18s ease-out;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-toast-in {
+  animation: toast-in 0.2s ease-out;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+.skeleton {
+  @apply relative overflow-hidden rounded-md bg-ink-400/10;
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.6), transparent);
+  animation: shimmer 1.4s infinite;
+}
