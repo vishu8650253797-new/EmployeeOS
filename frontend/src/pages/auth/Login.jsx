@@ -12,7 +12,10 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [form, setForm] = useState({ email: '', password: '' });
+  const [form, setForm] = useState({
+    email: import.meta.env.DEV ? 'admin@employeeos.io' : '',
+    password: import.meta.env.DEV ? 'Password123' : '',
+  });
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -54,7 +57,7 @@ export default function Login() {
           label="Work email"
           type="email"
           name="email"
-          autoComplete="email"
+          autoComplete="off"
           placeholder="you@company.com"
           required
           value={form.email}
@@ -68,7 +71,7 @@ export default function Login() {
               label="Password"
               type={showPassword ? 'text' : 'password'}
               name="password"
-              autoComplete="current-password"
+              autoComplete="off"
               placeholder="••••••••"
               required
               value={form.password}

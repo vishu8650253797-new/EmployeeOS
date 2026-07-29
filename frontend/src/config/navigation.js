@@ -4,6 +4,8 @@ import {
   Building2,
   CalendarCheck,
   CalendarOff,
+  CalendarPlus,
+  Layers,
   ClipboardList,
   TrendingUp,
   FolderOpen,
@@ -11,6 +13,13 @@ import {
   BarChart3,
   LifeBuoy,
   Settings,
+  FolderKanban,
+  Gauge,
+  Target,
+  Award,
+  MessageSquare,
+  History,
+  BarChart2,
 } from 'lucide-react';
 
 // Sidebar navigation. Later, filter sections/items by role permissions.
@@ -29,8 +38,18 @@ export const NAV_SECTIONS = [
     items: [
       { label: 'Attendance', to: '/attendance', icon: CalendarCheck },
       { label: 'Leave', to: '/leave', icon: CalendarOff },
+      { label: 'My Leave', to: '/my-leave', icon: CalendarPlus },
+      { label: 'Leave Types', to: '/leave-types', icon: Layers },
+      { label: 'Projects', to: '/projects', icon: FolderKanban },
+      { label: 'Workload', to: '/workload', icon: Gauge },
       { label: 'Tasks', to: '/tasks', icon: ClipboardList },
       { label: 'Performance', to: '/performance', icon: TrendingUp },
+      { label: 'Cycles', to: '/performance/cycles', icon: Award },
+      { label: 'Goals', to: '/performance/goals', icon: Target },
+      { label: 'KPIs', to: '/performance/kpis', icon: BarChart2 },
+      { label: 'Reviews', to: '/performance/reviews', icon: ClipboardList },
+      { label: 'Feedback', to: '/performance/feedback', icon: MessageSquare },
+      { label: 'History', to: '/performance/history', icon: History },
     ],
   },
   {

@@ -1,7 +1,8 @@
 const { Types } = require('mongoose');
 const { Attendance, Employee, User, Organization } = require('../models');
 const AppError = require('../utils/AppError');
-const { broadcast } = require('../utils/socketServer');
+const { getSocketInstance } = require('../socket/socketServer');
+const SOCKET_EVENTS = require('../utils/socketEvents');
 const {
   getOrgDate,
   getOrgTimeInMinutes,
@@ -121,7 +122,8 @@ async function checkIn(user) {
   });
 
   const result = toAttendanceDTO(await populateRecord(record._id), settings.timeZone);
-  broadcast('attendance:updated', result);
+  const io = getSocketInstance();
+  if (io) io.emit(SOCKET_EVENTS.ATTENDANCE_UPDATED, result);
   return result;
 }
 
@@ -165,7 +167,8 @@ async function checkOut(user) {
 
   await record.save();
   const result = toAttendanceDTO(await populateRecord(record._id), settings.timeZone);
-  broadcast('attendance:updated', result);
+  const io = getSocketInstance();
+  if (io) io.emit(SOCKET_EVENTS.ATTENDANCE_UPDATED, result);
   return result;
 }
 
@@ -296,7 +299,7 @@ async function getAttendance(organizationId, query = {}) {
     filter.status = status;
   }
 
-  const employeeFilter = { organizationId: new Types.ObjectId(organizationId), isDeleted: { $ne: true } };
+  const employeeFilter = { organizationId: new Types.ObjectId(organizationId), isDeleted: { $ne: true }, status: { $in: ['ACTIVE', 'ON_LEAVE'] } };
   if (departmentId) employeeFilter.departmentId = new Types.ObjectId(departmentId);
 
   let employeeIds = [];
@@ -353,6 +356,41 @@ async function getAttendance(organizationId, query = {}) {
     const start = (pageNum - 1) * limitNum;
     const paginated = filtered.slice(start, start + limitNum);
     return { records: paginated, pagination: buildPagination(filtered.length, pageNum, limitNum) };
+  }
+
+  if (records.length === 0 && date && (!status || status === 'ABSENT')) {
+    if (employeeId) employeeFilter._id = new Types.ObjectId(employeeId);
+
+    const employees = await Employee.find(employeeFilter)
+      .populate({ path: 'departmentId', select: 'name code' })
+      .lean();
+
+    const fallbackRecords = employees.map((e) => {
+      const dept = e.departmentId || {};
+      return {
+        id: null,
+        employeeId: e._id.toString(),
+        employeeName: `${e.firstName || ''} ${e.lastName || ''}`.trim(),
+        employeeCode: e.employeeId || '—',
+        employeeEmail: e.email || '',
+        department: dept.name || '—',
+        departmentId: dept._id ? dept._id.toString() : null,
+        date,
+        checkInTime: null,
+        checkOutTime: null,
+        workingHours: '0h 0m',
+        workingMinutes: 0,
+        late: '0h 0m',
+        lateMinutes: 0,
+        earlyDeparture: '0h 0m',
+        earlyDepartureMinutes: 0,
+        checkedIn: false,
+        checkedOut: false,
+        status: 'ABSENT',
+      };
+    });
+
+    return { records: fallbackRecords, pagination: buildPagination(fallbackRecords.length, pageNum, limitNum) };
   }
 
   return { records: dtoRecords, pagination: buildPagination(total, pageNum, limitNum) };

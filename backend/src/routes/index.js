@@ -5,6 +5,20 @@ const employeeRoutes = require('./employeeRoutes');
 const departmentRoutes = require('./departmentRoutes');
 const dashboardRoutes = require('./dashboardRoutes');
 const attendanceRoutes = require('./attendanceRoutes');
+const leaveTypeRoutes = require('./leaveTypeRoutes');
+const leaveBalanceRoutes = require('./leaveBalanceRoutes');
+const leaveRequestRoutes = require('./leaveRequestRoutes');
+const notificationRoutes = require('./notificationRoutes');
+const projectRoutes = require('./projectRoutes');
+const taskRoutes = require('./taskRoutes');
+const taskCommentRoutes = require('./taskCommentRoutes');
+const workloadRoutes = require('./workloadRoutes');
+const performanceCycleRoutes = require('./performanceCycleRoutes');
+const goalRoutes = require('./goalRoutes');
+const kpiRoutes = require('./kpiRoutes');
+const performanceReviewRoutes = require('./performanceReviewRoutes');
+const feedbackRoutes = require('./feedbackRoutes');
+const performanceAnalyticsRoutes = require('./performanceAnalyticsRoutes');
 
 const router = Router();
 
@@ -18,9 +32,19 @@ router.use('/employees', employeeRoutes);
 router.use('/departments', departmentRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/attendance', attendanceRoutes);
-
-// Phase 5+ route modules to be mounted here:
-// router.use('/attendance', attendanceRoutes);
-// router.use('/leave', leaveRoutes);
+router.use('/leave-types', leaveTypeRoutes);
+router.use('/leave-balances', leaveBalanceRoutes);
+router.use('/leave-requests', leaveRequestRoutes);
+router.use('/notifications', notificationRoutes);
+router.use('/projects', projectRoutes);
+router.use('/tasks', taskRoutes);
+router.use('/comments', taskCommentRoutes);
+router.use('/workload', workloadRoutes);
+router.use('/performance-cycles', performanceCycleRoutes);
+router.use('/goals', goalRoutes);
+router.use('/kpis', kpiRoutes);
+router.use('/performance-reviews', performanceReviewRoutes);
+router.use('/feedback', feedbackRoutes);
+router.use('/performance-analytics', performanceAnalyticsRoutes);
 
 module.exports = router;

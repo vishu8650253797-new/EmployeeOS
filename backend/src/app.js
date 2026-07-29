@@ -9,24 +9,17 @@ const { errorHandler, notFound } = require('./middleware/errorMiddleware');
 
 const app = express();
 
-const allowedOrigins = new Set([
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://127.0.0.1:5173',
-  'http://127.0.0.1:5174',
-  process.env.CLIENT_URL,
-].filter(Boolean));
+const isProduction = process.env.NODE_ENV === 'production';
 
-const corsOptions = {
-  origin: Array.from(allowedOrigins),
-  credentials: true,
-  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  optionsSuccessStatus: 204,
-};
-
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+app.use(
+  cors({
+    origin: isProduction ? process.env.CLIENT_URL : true,
+    credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    optionsSuccessStatus: 204,
+  })
+);
 app.use(helmet());
 app.use(express.json());
 app.use(cookieParser());

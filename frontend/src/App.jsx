@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { SocketProvider } from './context/SocketContext';
 import AppLayout from './components/layout/AppLayout';
 import AuthLayout from './components/layout/AuthLayout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -22,6 +23,22 @@ const DepartmentDetails = lazy(() => import('./pages/departments/DepartmentDetai
 const Attendance = lazy(() => import('./pages/attendance/Attendance'));
 const MyAttendance = lazy(() => import('./pages/attendance/MyAttendance'));
 const Leave = lazy(() => import('./pages/leave/Leave'));
+const MyLeave = lazy(() => import('./pages/leave/MyLeave'));
+const LeaveTypes = lazy(() => import('./pages/leave/LeaveTypes'));
+const Projects = lazy(() => import('./pages/projects/Projects'));
+const ProjectDetails = lazy(() => import('./pages/projects/ProjectDetails'));
+const KanbanBoard = lazy(() => import('./pages/projects/KanbanBoard'));
+const TaskList = lazy(() => import('./pages/projects/TaskList'));
+const TaskDetails = lazy(() => import('./pages/projects/TaskDetails'));
+const Workload = lazy(() => import('./pages/workload/Workload'));
+const Performance = lazy(() => import('./pages/performance/Performance'));
+const PerformanceCycles = lazy(() => import('./pages/performance/PerformanceCycles'));
+const Goals = lazy(() => import('./pages/performance/Goals'));
+const KPIs = lazy(() => import('./pages/performance/KPIs'));
+const PerformanceReviews = lazy(() => import('./pages/performance/PerformanceReviews'));
+const Feedback = lazy(() => import('./pages/performance/Feedback'));
+const PerformanceHistory = lazy(() => import('./pages/performance/PerformanceHistory'));
+const PerformanceAnalytics = lazy(() => import('./pages/performance/PerformanceAnalytics'));
 const ComingSoon = lazy(() => import('./pages/misc/ComingSoon'));
 const NotFound = lazy(() => import('./pages/misc/NotFound'));
 
@@ -30,7 +47,8 @@ export default function App() {
     <BrowserRouter>
       <ToastProvider>
         <AuthProvider>
-          <Suspense fallback={<LoadingState label="Loading EmployeeOS…" className="min-h-dvh" />}>
+          <SocketProvider>
+            <Suspense fallback={<LoadingState label="Loading EmployeeOS…" className="min-h-dvh" />}>
             <Routes>
               {/* Public auth routes */}
               <Route element={<AuthLayout />}>
@@ -55,9 +73,28 @@ export default function App() {
                   <Route path="/attendance" element={<Attendance />} />
                   <Route path="/my-attendance" element={<MyAttendance />} />
                   <Route path="/leave" element={<Leave />} />
+                  <Route path="/my-leave" element={<MyLeave />} />
+                  <Route path="/leave-types" element={<LeaveTypes />} />
+
+                  <Route path="/projects" element={<Projects />} />
+                  <Route path="/projects/:id" element={<ProjectDetails />} />
+                  <Route path="/projects/:id/board" element={<KanbanBoard />} />
+                  <Route path="/projects/:id/tasks" element={<TaskList />} />
+                  <Route path="/projects/:id/tasks/new" element={<ComingSoon title="New Task" />} />
+                  <Route path="/projects/:id/tasks/:taskId" element={<TaskDetails />} />
+                  <Route path="/projects/:id/tasks/:taskId/edit" element={<ComingSoon title="Edit Task" />} />
+                  <Route path="/workload" element={<Workload />} />
+
+                  <Route path="/performance" element={<Performance />} />
+                  <Route path="/performance/cycles" element={<PerformanceCycles />} />
+                  <Route path="/performance/goals" element={<Goals />} />
+                  <Route path="/performance/kpis" element={<KPIs />} />
+                  <Route path="/performance/reviews" element={<PerformanceReviews />} />
+                  <Route path="/performance/feedback" element={<Feedback />} />
+                  <Route path="/performance/history" element={<PerformanceHistory />} />
+                  <Route path="/performance/analytics" element={<PerformanceAnalytics />} />
 
                   <Route path="/tasks" element={<ComingSoon title="Tasks" />} />
-                  <Route path="/performance" element={<ComingSoon title="Performance" />} />
                   <Route path="/documents" element={<ComingSoon title="Documents" />} />
                   <Route path="/payroll" element={<ComingSoon title="Payroll" />} />
                   <Route path="/reports" element={<ComingSoon title="Reports" />} />
@@ -70,6 +107,7 @@ export default function App() {
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
+          </SocketProvider>
         </AuthProvider>
       </ToastProvider>
     </BrowserRouter>

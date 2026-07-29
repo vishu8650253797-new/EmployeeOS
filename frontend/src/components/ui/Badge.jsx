@@ -14,21 +14,38 @@ export const STATUS_TONES = {
   PRESENT: 'success',
   Present: 'success',
   Approved: 'success',
-  'ON_LEAVE': 'info',
+  APPROVED: 'success',
   ON_LEAVE: 'info',
   'On Leave': 'info',
   Pending: 'warning',
+  PENDING: 'warning',
   LATE: 'warning',
   Late: 'warning',
   Probation: 'warning',
   SUSPENDED: 'warning',
   HALF_DAY: 'warning',
-  'INACTIVE': 'neutral',
+  CANCELLED: 'neutral',
   INACTIVE: 'neutral',
   Inactive: 'neutral',
   ABSENT: 'danger',
   Absent: 'danger',
   Rejected: 'danger',
+  REJECTED: 'danger',
+  TODO: 'neutral',
+  IN_PROGRESS: 'info',
+  IN_REVIEW: 'warning',
+  BLOCKED: 'danger',
+  DONE: 'success',
+  PLANNING: 'neutral',
+  ON_HOLD: 'warning',
+  COMPLETED: 'success',
+};
+
+export const PRIORITY_TONES = {
+  LOW: 'neutral',
+  MEDIUM: 'info',
+  HIGH: 'warning',
+  URGENT: 'danger',
 };
 
 export default function Badge({ children, tone = 'neutral', dot = true, className = '' }) {
@@ -46,6 +63,14 @@ export function StatusBadge({ status, className = '' }) {
   return (
     <Badge tone={STATUS_TONES[status] || 'neutral'} className={className}>
       {status}
+    </Badge>
+  );
+}
+
+export function PriorityBadge({ priority, className = '' }) {
+  return (
+    <Badge tone={PRIORITY_TONES[priority] || 'neutral'} className={className}>
+      {priority}
     </Badge>
   );
 }

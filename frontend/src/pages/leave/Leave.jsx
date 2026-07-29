@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { CalendarOff, Check, X, Eye } from 'lucide-react';
+import { CalendarOff, Check, X, Eye, Plus, Ban } from 'lucide-react';
 import { leaveService } from '../../services/leaveService';
+import { leaveRequestService } from '../../services/leaveRequestService';
 import { useFetch } from '../../hooks/useFetch';
 import { useToast } from '../../context/ToastContext';
+import { useSocketEvent } from '../../hooks/useSocket';
+import { SOCKET_EVENTS } from '../../utils/socketEvents';
 import { formatDate } from '../../utils/format';
 import PageHeader from '../../components/layout/PageHeader';
 import Card, { CardHeader } from '../../components/ui/Card';
@@ -13,6 +16,7 @@ import Tabs from '../../components/ui/Tabs';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Tooltip from '../../components/ui/Tooltip';
+import LeaveRequestForm from '../../components/leave/LeaveRequestForm';
 import { TableSkeleton } from '../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../components/ui/States';
 import {
@@ -25,12 +29,15 @@ import {
   TD,
 } from '../../components/ui/Table';
 
+const ACTION_LABELS = { approve: 'Approve', reject: 'Reject', cancel: 'Cancel' };
+
 export default function Leave() {
   const { toast } = useToast();
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const [detailTarget, setDetailTarget] = useState(null);
-  const [confirmAction, setConfirmAction] = useState(null); // { type: 'approve'|'reject', request }
+  const [confirmAction, setConfirmAction] = useState(null); // { type: 'approve'|'reject'|'cancel', request }
   const [processing, setProcessing] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
 
   const {
     data: requests,
@@ -44,21 +51,37 @@ export default function Leave() {
     []
   );
 
-  const { data: allRequests } = useFetch(() => leaveService.getLeaveRequests(), []);
+  const { data: allRequests, refetch: refetchAll } = useFetch(
+    () => leaveService.getLeaveRequests(),
+    []
+  );
+
+  function refreshAll() {
+    refetch();
+    refetchAll();
+  }
+
+  useSocketEvent(SOCKET_EVENTS.LEAVE_REQUEST_CREATED, refreshAll, [refetch, refetchAll]);
+  useSocketEvent(SOCKET_EVENTS.LEAVE_REQUEST_APPROVED, refreshAll, [refetch, refetchAll]);
+  useSocketEvent(SOCKET_EVENTS.LEAVE_REQUEST_REJECTED, refreshAll, [refetch, refetchAll]);
+  useSocketEvent(SOCKET_EVENTS.LEAVE_REQUEST_CANCELLED, refreshAll, [refetch, refetchAll]);
+  useSocketEvent(SOCKET_EVENTS.DASHBOARD_LEAVE_UPDATED, refreshAll, [refetch, refetchAll]);
+
   const counts = (allRequests || []).reduce(
     (acc, request) => {
       acc.all += 1;
       acc[request.status] = (acc[request.status] || 0) + 1;
       return acc;
     },
-    { all: 0, Pending: 0, Approved: 0, Rejected: 0 }
+    { all: 0, PENDING: 0, APPROVED: 0, REJECTED: 0, CANCELLED: 0 }
   );
 
   const tabs = [
-    { value: 'all', label: 'All requests', count: counts.all },
-    { value: 'Pending', label: 'Pending', count: counts.Pending },
-    { value: 'Approved', label: 'Approved', count: counts.Approved },
-    { value: 'Rejected', label: 'Rejected', count: counts.Rejected },
+    { value: 'ALL', label: 'All requests', count: counts.all },
+    { value: 'PENDING', label: 'Pending', count: counts.PENDING },
+    { value: 'APPROVED', label: 'Approved', count: counts.APPROVED },
+    { value: 'REJECTED', label: 'Rejected', count: counts.REJECTED },
+    { value: 'CANCELLED', label: 'Cancelled', count: counts.CANCELLED },
   ];
 
   async function handleConfirm() {
@@ -69,14 +92,18 @@ export default function Leave() {
       if (type === 'approve') {
         await leaveService.approveLeave(request.id);
         toast(`${request.employeeName}'s leave request approved.`);
-      } else {
+      } else if (type === 'reject') {
         await leaveService.rejectLeave(request.id, 'Rejected by approver.');
         toast(`${request.employeeName}'s leave request rejected.`, 'info');
+      } else {
+        await leaveRequestService.cancelLeaveRequest(request.id);
+        toast(`${request.employeeName}'s leave request cancelled.`, 'info');
       }
       setConfirmAction(null);
-      refetch();
-    } catch {
-      toast('Action failed. Please try again.', 'error');
+      refreshAll();
+    } catch (err) {
+      const message = err?.response?.data?.message || 'Action failed. Please try again.';
+      toast(message, 'error');
     } finally {
       setProcessing(false);
     }
@@ -84,7 +111,16 @@ export default function Leave() {
 
   return (
     <div>
-      <PageHeader title="Leave Management" subtitle="Review and manage team leave requests" />
+      <PageHeader
+        title="Leave Management"
+        subtitle="Review and manage team leave requests"
+        actions={
+          <Button onClick={() => setFormOpen(true)}>
+            <Plus size={15} />
+            Apply for leave
+          </Button>
+        }
+      />
 
       {/* Leave balance summary */}
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
@@ -163,7 +199,7 @@ export default function Leave() {
                   <TD className="text-ink-500">
                     {formatDate(request.startDate)} – {formatDate(request.endDate)}
                   </TD>
-                  <TD>{request.days}</TD>
+                  <TD>{request.numberOfDays}</TD>
                   <TD>
                     <span className="block max-w-52 truncate" title={request.reason}>
                       {request.reason}
@@ -174,7 +210,7 @@ export default function Leave() {
                   </TD>
                   <TD className="text-right">
                     <span className="inline-flex items-center gap-1">
-                      {request.status === 'Pending' && (
+                      {request.status === 'PENDING' && (
                         <>
                           <Tooltip label="Approve">
                             <button
@@ -197,6 +233,18 @@ export default function Leave() {
                             </button>
                           </Tooltip>
                         </>
+                      )}
+                      {(request.status === 'PENDING' || request.status === 'APPROVED') && (
+                        <Tooltip label="Cancel">
+                          <button
+                            type="button"
+                            aria-label={`Cancel ${request.employeeName}'s request`}
+                            onClick={() => setConfirmAction({ type: 'cancel', request })}
+                            className="focus-ring rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-ink-400/10 hover:text-ink-700"
+                          >
+                            <Ban size={16} />
+                          </button>
+                        </Tooltip>
                       )}
                       <Tooltip label="View details">
                         <button
@@ -223,7 +271,7 @@ export default function Leave() {
         onClose={() => setDetailTarget(null)}
         title="Leave request details"
         footer={
-          detailTarget?.status === 'Pending' ? (
+          detailTarget?.status === 'PENDING' ? (
             <>
               <Button
                 variant="secondary"
@@ -270,7 +318,7 @@ export default function Leave() {
               <div>
                 <dt className="text-xs text-ink-400">Duration</dt>
                 <dd className="mt-0.5 font-medium text-ink-900">
-                  {detailTarget.days} {detailTarget.days === 1 ? 'day' : 'days'}
+                  {detailTarget.numberOfDays} {detailTarget.numberOfDays === 1 ? 'day' : 'days'}
                 </dd>
               </div>
               <div>
@@ -282,12 +330,12 @@ export default function Leave() {
                 <dd className="mt-0.5 font-medium text-ink-900">{formatDate(detailTarget.endDate)}</dd>
               </div>
               <div>
-                <dt className="text-xs text-ink-400">Applied on</dt>
-                <dd className="mt-0.5 font-medium text-ink-900">{formatDate(detailTarget.appliedOn)}</dd>
+                <dt className="text-xs text-ink-400">Submitted</dt>
+                <dd className="mt-0.5 font-medium text-ink-900">{formatDate(detailTarget.createdAt)}</dd>
               </div>
               <div>
-                <dt className="text-xs text-ink-400">Approver</dt>
-                <dd className="mt-0.5 font-medium text-ink-900">{detailTarget.approver}</dd>
+                <dt className="text-xs text-ink-400">Reviewed by</dt>
+                <dd className="mt-0.5 font-medium text-ink-900">{detailTarget.reviewedBy?.name || '-'}</dd>
               </div>
             </dl>
             <div>
@@ -304,20 +352,27 @@ export default function Leave() {
         )}
       </Modal>
 
-      {/* Approve / reject confirmation */}
+      {/* Approve / reject / cancel confirmation */}
       <ConfirmDialog
         open={Boolean(confirmAction)}
         onClose={() => setConfirmAction(null)}
         onConfirm={handleConfirm}
         loading={processing}
         variant={confirmAction?.type === 'approve' ? 'primary' : 'danger'}
-        title={confirmAction?.type === 'approve' ? 'Approve leave request' : 'Reject leave request'}
+        title={`${ACTION_LABELS[confirmAction?.type] || 'Confirm'} leave request`}
         message={
           confirmAction
-            ? `${confirmAction.type === 'approve' ? 'Approve' : 'Reject'} ${confirmAction.request.employeeName}'s ${confirmAction.request.leaveType.toLowerCase()} request for ${confirmAction.request.days} ${confirmAction.request.days === 1 ? 'day' : 'days'} (${formatDate(confirmAction.request.startDate)} – ${formatDate(confirmAction.request.endDate)})?`
+            ? `${ACTION_LABELS[confirmAction.type]} ${confirmAction.request.employeeName}'s ${confirmAction.request.leaveType.toLowerCase()} request for ${confirmAction.request.numberOfDays} ${confirmAction.request.numberOfDays === 1 ? 'day' : 'days'} (${formatDate(confirmAction.request.startDate)} – ${formatDate(confirmAction.request.endDate)})?`
             : ''
         }
-        confirmLabel={confirmAction?.type === 'approve' ? 'Approve' : 'Reject'}
+        confirmLabel={ACTION_LABELS[confirmAction?.type] || 'Confirm'}
+      />
+
+      {/* Apply for leave */}
+      <LeaveRequestForm
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        onSuccess={refreshAll}
       />
     </div>
   );

@@ -1,7 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import { Menu, Search, Bell, HelpCircle, ChevronDown, User, Settings, LogOut } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { NOTIFICATIONS } from '../../data/dashboard';
+import { notificationService } from '../../services/notificationService';
+import { useSocketEvent } from '../../hooks/useSocket';
+import { SOCKET_EVENTS } from '../../utils/socketEvents';
 import Avatar from '../ui/Avatar';
 import Dropdown, { DropdownItem, DropdownSeparator } from '../ui/Dropdown';
 import Tooltip from '../ui/Tooltip';
@@ -9,7 +12,50 @@ import Tooltip from '../ui/Tooltip';
 export default function Topbar({ onOpenMobileNav }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const unreadCount = NOTIFICATIONS.filter((n) => !n.read).length;
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  async function loadNotifications() {
+    try {
+      const [listRes, countRes] = await Promise.all([
+        notificationService.getNotifications({ limit: 20 }),
+        notificationService.getUnreadCount(),
+      ]);
+      setNotifications(listRes.data || []);
+      setUnreadCount(countRes.data?.count || 0);
+    } catch {
+      // silently fail; fallback to empty list
+    }
+  }
+
+  useEffect(() => {
+    loadNotifications();
+  }, []);
+
+  useSocketEvent(SOCKET_EVENTS.NOTIFICATION_NEW, () => loadNotifications(), []);
+
+  async function handleMarkAsRead(notification) {
+    if (notification.isRead) return;
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n))
+    );
+    setUnreadCount((prev) => Math.max(prev - 1, 0));
+    try {
+      await notificationService.markAsRead(notification.id);
+    } catch {
+      loadNotifications();
+    }
+  }
+
+  async function handleMarkAllAsRead() {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    setUnreadCount(0);
+    try {
+      await notificationService.markAllAsRead();
+    } catch {
+      loadNotifications();
+    }
+  }
 
   async function handleLogout() {
     await logout();
@@ -82,33 +128,47 @@ export default function Topbar({ onOpenMobileNav }) {
             </button>
           )}
         >
-          <div className="flex items-center justify-between px-3.5 py-2">
+          <div className="flex items-center justify-between gap-2 px-3.5 py-2">
             <p className="text-[13px] font-semibold text-ink-900">Notifications</p>
-            <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700">
+            <span className="ml-auto rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700">
               {unreadCount} new
             </span>
+            {unreadCount > 0 && (
+              <button
+                type="button"
+                onClick={handleMarkAllAsRead}
+                className="focus-ring rounded px-1 text-[11px] font-medium text-brand-700 transition-colors hover:text-brand-800"
+              >
+                Mark all read
+              </button>
+            )}
           </div>
           <DropdownSeparator />
           <div className="max-h-80 overflow-y-auto">
-            {NOTIFICATIONS.map((notification) => (
-              <div
+            {notifications.length === 0 && (
+              <p className="px-3.5 py-4 text-center text-xs text-ink-500">No notifications</p>
+            )}
+            {notifications.map((notification) => (
+              <button
                 key={notification.id}
-                className={`flex gap-2.5 px-3.5 py-2.5 transition-colors hover:bg-canvas ${
-                  notification.read ? 'opacity-70' : ''
+                type="button"
+                onClick={() => handleMarkAsRead(notification)}
+                className={`flex w-full gap-2.5 px-3.5 py-2.5 text-left transition-colors hover:bg-canvas ${
+                  notification.isRead ? 'opacity-70' : ''
                 }`}
               >
                 <span
                   className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
-                    notification.read ? 'bg-line-strong' : 'bg-brand-600'
+                    notification.isRead ? 'bg-line-strong' : 'bg-brand-600'
                   }`}
                   aria-hidden="true"
                 />
                 <div className="min-w-0">
                   <p className="text-[13px] font-medium text-ink-900">{notification.title}</p>
                   <p className="mt-0.5 line-clamp-2 text-xs text-ink-500">{notification.message}</p>
-                  <p className="mt-1 text-[11px] text-ink-400">{notification.time}</p>
+                  <p className="mt-1 text-[11px] text-ink-400">{new Date(notification.createdAt).toLocaleString()}</p>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </Dropdown>

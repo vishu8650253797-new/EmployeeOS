@@ -1,0 +1,366 @@
+const { Types } = require('mongoose');
+const { LeaveRequest, LeaveType, LeaveBalance, Employee, User, Notification } = require('../models');
+const AppError = require('../utils/AppError');
+const { countWorkingDays, hasOverlap } = require('../utils/leaveUtils');
+const SOCKET_EVENTS = require('../utils/socketEvents');
+const { getSocketInstance } = require('../socket/socketServer');
+const leaveBalanceService = require('./leaveBalanceService');
+
+const CURRENT_YEAR = new Date().getFullYear();
+
+function toLeaveDTO(request, employee, leaveType, reviewer) {
+  const emp = employee || {};
+  const lt = leaveType || {};
+  const rev = reviewer || {};
+  return {
+    id: request._id.toString(),
+    organizationId: request.organizationId.toString(),
+    employeeId: request.employeeId.toString(),
+    employeeName: `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || 'Unknown',
+    employeeCode: emp.employeeId || '',
+    departmentId: emp.departmentId ? emp.departmentId.toString() : null,
+    leaveTypeId: request.leaveTypeId.toString(),
+    leaveType: lt.name || 'Leave',
+    startDate: request.startDate.toISOString().slice(0, 10),
+    endDate: request.endDate.toISOString().slice(0, 10),
+    numberOfDays: request.numberOfDays,
+    durationType: request.durationType,
+    reason: request.reason || '',
+    status: request.status,
+    approvalLevel: request.approvalLevel,
+    submittedAt: request.submittedAt,
+    reviewedAt: request.reviewedAt,
+    reviewedBy: rev._id ? { id: rev._id.toString(), name: `${rev.firstName || ''} ${rev.lastName || ''}`.trim() } : null,
+    rejectionReason: request.rejectionReason || '',
+    cancelledAt: request.cancelledAt,
+    createdAt: request.createdAt,
+    updatedAt: request.updatedAt,
+  };
+}
+
+async function populateRequest(request) {
+  const [employee, leaveType, reviewer] = await Promise.all([
+    Employee.findById(request.employeeId).lean(),
+    LeaveType.findById(request.leaveTypeId).lean(),
+    request.reviewedBy ? User.findById(request.reviewedBy).lean() : null,
+  ]);
+  return toLeaveDTO(request, employee, leaveType, reviewer);
+}
+
+async function findEmployeesToNotify(organizationId, requestEmployeeId) {
+  const employee = await Employee.findById(requestEmployeeId).lean();
+  if (!employee) return [];
+
+  const recipients = [];
+
+  // manager of the same department
+  if (employee.departmentId) {
+    const managers = await Employee.find({
+      organizationId: new Types.ObjectId(organizationId),
+      departmentId: new Types.ObjectId(employee.departmentId),
+      $or: [{ role: 'MANAGER' }, { role: 'SUPER_ADMIN' }, { role: 'HR_ADMIN' }],
+    }).lean();
+    recipients.push(...managers);
+  }
+
+  // HR admins + super admins
+  const hrUsers = await User.find({
+    organizationId: new Types.ObjectId(organizationId),
+    role: { $in: ['HR_ADMIN', 'SUPER_ADMIN'] },
+    status: 'active',
+  }).lean();
+  recipients.push(...hrUsers);
+
+  // dedupe by userId, and only include recipients with a linked user account
+  const seen = new Set();
+  return recipients
+    .filter((r) => r.userId)
+    .filter((r) => {
+      const key = r.userId.toString();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+async function createLeaveRequest(organizationId, payload, actor) {
+  const employee = await Employee.findById(payload.employeeId).lean();
+  if (!employee || employee.organizationId.toString() !== organizationId.toString()) throw new AppError('Employee not found', 404);
+
+  const leaveType = await LeaveType.findById(payload.leaveTypeId).lean();
+  if (!leaveType || leaveType.organizationId.toString() !== organizationId.toString()) throw new AppError('Leave type not found', 404);
+
+  const halfDay = payload.durationType === 'HALF_DAY' && leaveType.allowHalfDay;
+  const numberOfDays = countWorkingDays(payload.startDate, payload.endDate, halfDay);
+  if (numberOfDays <= 0) throw new AppError('Selected dates do not contain any working days', 400);
+
+  const overlap = await hasOverlap(organizationId, payload.employeeId, payload.startDate, payload.endDate);
+  if (overlap > 0) throw new AppError('Leave request overlaps with an existing request', 400);
+
+  await leaveBalanceService.ensureBalancesForEmployee(
+    organizationId,
+    payload.employeeId,
+    CURRENT_YEAR
+  );
+
+  const balance = await LeaveBalance.findOne({
+    organizationId: new Types.ObjectId(organizationId),
+    employeeId: new Types.ObjectId(payload.employeeId),
+    leaveTypeId: new Types.ObjectId(payload.leaveTypeId),
+    year: CURRENT_YEAR,
+  });
+  if (!balance) throw new AppError('Leave balance not found for this leave type', 400);
+  const required = halfDay ? numberOfDays : numberOfDays;
+  if (balance.remainingDays < required) throw new AppError('Insufficient leave balance', 400);
+
+  const request = await LeaveRequest.create({
+    organizationId: new Types.ObjectId(organizationId),
+    employeeId: new Types.ObjectId(payload.employeeId),
+    leaveTypeId: new Types.ObjectId(payload.leaveTypeId),
+    startDate: new Date(payload.startDate),
+    endDate: new Date(payload.endDate),
+    numberOfDays,
+    durationType: halfDay ? 'HALF_DAY' : 'FULL_DAY',
+    reason: payload.reason || '',
+    status: 'PENDING',
+    approvalLevel: 'MANAGER',
+    submittedAt: new Date(),
+  });
+
+  balance.pendingDays += numberOfDays;
+  balance.remainingDays = balance.allocatedDays + balance.carriedForwardDays - balance.usedDays - balance.pendingDays;
+  await balance.save();
+
+  const populated = await populateRequest(request);
+
+  // notify managers / HR
+  const io = getSocketInstance();
+  const recipients = await findEmployeesToNotify(organizationId, payload.employeeId);
+  for (const r of recipients) {
+    const userId = r.userId ? r.userId.toString() : r._id.toString();
+    await Notification.create({
+      organizationId: new Types.ObjectId(organizationId),
+      recipientId: new Types.ObjectId(userId),
+      type: 'LEAVE_REQUEST_SUBMITTED',
+      title: 'New leave request',
+      message: `${populated.employeeName} requested ${numberOfDays} ${numberOfDays === 1 ? 'day' : 'days'} of ${populated.leaveType}`,
+      entityType: 'LEAVE_REQUEST',
+      entityId: request._id,
+    });
+    if (io) {
+      io.to(`user:${userId}`).emit(SOCKET_EVENTS.NOTIFICATION_NEW);
+      io.to(`organization:${organizationId}`).emit(SOCKET_EVENTS.LEAVE_REQUEST_CREATED, populated);
+      io.to(`organization:${organizationId}`).emit(SOCKET_EVENTS.DASHBOARD_LEAVE_UPDATED, { pendingCount: await LeaveRequest.countDocuments({ organizationId: new Types.ObjectId(organizationId), status: 'PENDING' }) });
+    }
+  }
+
+  if (io && employee.userId) {
+    io.to(`user:${employee.userId.toString()}`).emit(SOCKET_EVENTS.LEAVE_REQUEST_CREATED, populated);
+    io.to(`user:${employee.userId.toString()}`).emit(SOCKET_EVENTS.LEAVE_BALANCE_UPDATED);
+  }
+
+  return populated;
+}
+
+async function getLeaveRequests(organizationId, filters = {}) {
+  const { status, employeeId, page = 1, limit = 20 } = filters;
+  const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+  const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+  const skip = (pageNum - 1) * limitNum;
+
+  const query = { organizationId: new Types.ObjectId(organizationId) };
+  if (status && ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'].includes(status)) query.status = status;
+  if (employeeId) query.employeeId = new Types.ObjectId(employeeId);
+
+  const [data, total] = await Promise.all([
+    LeaveRequest.find(query).sort({ createdAt: -1 }).skip(skip).limit(limitNum).lean(),
+    LeaveRequest.countDocuments(query),
+  ]);
+
+  const populated = await Promise.all(data.map((r) => populateRequest(r)));
+  return {
+    data: populated,
+    pagination: { page: pageNum, limit: limitNum, total, totalPages: Math.ceil(total / limitNum) },
+  };
+}
+
+async function getMyLeaveRequests(organizationId, employeeId, filters = {}) {
+  const query = {
+    organizationId: new Types.ObjectId(organizationId),
+    employeeId: new Types.ObjectId(employeeId),
+  };
+  if (filters.status && ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'].includes(filters.status)) {
+    query.status = filters.status;
+  }
+  const data = await LeaveRequest.find(query).sort({ createdAt: -1 }).lean();
+  const populated = await Promise.all(data.map((r) => populateRequest(r)));
+  return { data: populated };
+}
+
+async function getLeaveRequestById(organizationId, id) {
+  const request = await LeaveRequest.findOne({ _id: id, organizationId: new Types.ObjectId(organizationId) }).lean();
+  if (!request) throw new AppError('Leave request not found', 404);
+  return populateRequest(request);
+}
+
+async function approveLeaveRequest(organizationId, id, actor) {
+  const request = await LeaveRequest.findOne({ _id: id, organizationId: new Types.ObjectId(organizationId) });
+  if (!request) throw new AppError('Leave request not found', 404);
+  if (request.status !== 'PENDING') throw new AppError('Only pending requests can be approved', 400);
+
+  const balance = await LeaveBalance.findOne({
+    organizationId: new Types.ObjectId(organizationId),
+    employeeId: new Types.ObjectId(request.employeeId),
+    leaveTypeId: new Types.ObjectId(request.leaveTypeId),
+    year: CURRENT_YEAR,
+  });
+  if (balance) {
+    balance.pendingDays -= request.numberOfDays;
+    balance.usedDays += request.numberOfDays;
+    balance.remainingDays = balance.allocatedDays + balance.carriedForwardDays - balance.usedDays - balance.pendingDays;
+    await balance.save();
+  }
+
+  request.status = 'APPROVED';
+  request.reviewedAt = new Date();
+  request.reviewedBy = actor._id;
+  await request.save();
+
+  const populated = await populateRequest(request.toObject());
+  const employee = await Employee.findById(request.employeeId).lean();
+  const io = getSocketInstance();
+  if (io) {
+    if (employee && employee.userId) {
+      io.to(`user:${employee.userId.toString()}`).emit(SOCKET_EVENTS.LEAVE_REQUEST_APPROVED, populated);
+      io.to(`user:${employee.userId.toString()}`).emit(SOCKET_EVENTS.LEAVE_BALANCE_UPDATED);
+      io.to(`user:${employee.userId.toString()}`).emit(SOCKET_EVENTS.NOTIFICATION_NEW);
+    }
+    io.to(`organization:${organizationId}`).emit(SOCKET_EVENTS.DASHBOARD_LEAVE_UPDATED, { pendingCount: await LeaveRequest.countDocuments({ organizationId: new Types.ObjectId(organizationId), status: 'PENDING' }) });
+  }
+
+  if (employee && employee.userId) {
+    await Notification.create({
+      organizationId: new Types.ObjectId(organizationId),
+      recipientId: employee.userId,
+      type: 'LEAVE_REQUEST_APPROVED',
+      title: 'Leave approved',
+      message: `Your ${populated.leaveType} request from ${populated.startDate} to ${populated.endDate} was approved.`,
+      entityType: 'LEAVE_REQUEST',
+      entityId: request._id,
+    });
+  }
+
+  return populated;
+}
+
+async function rejectLeaveRequest(organizationId, id, actor, rejectionReason) {
+  const request = await LeaveRequest.findOne({ _id: id, organizationId: new Types.ObjectId(organizationId) });
+  if (!request) throw new AppError('Leave request not found', 404);
+  if (request.status !== 'PENDING') throw new AppError('Only pending requests can be rejected', 400);
+
+  const balance = await LeaveBalance.findOne({
+    organizationId: new Types.ObjectId(organizationId),
+    employeeId: new Types.ObjectId(request.employeeId),
+    leaveTypeId: new Types.ObjectId(request.leaveTypeId),
+    year: CURRENT_YEAR,
+  });
+  if (balance) {
+    balance.pendingDays -= request.numberOfDays;
+    balance.remainingDays = balance.allocatedDays + balance.carriedForwardDays - balance.usedDays - balance.pendingDays;
+    await balance.save();
+  }
+
+  request.status = 'REJECTED';
+  request.reviewedAt = new Date();
+  request.reviewedBy = actor._id;
+  request.rejectionReason = rejectionReason || '';
+  await request.save();
+
+  const populated = await populateRequest(request.toObject());
+  const employee = await Employee.findById(request.employeeId).lean();
+  const io = getSocketInstance();
+  if (io) {
+    if (employee && employee.userId) {
+      io.to(`user:${employee.userId.toString()}`).emit(SOCKET_EVENTS.LEAVE_REQUEST_REJECTED, populated);
+      io.to(`user:${employee.userId.toString()}`).emit(SOCKET_EVENTS.LEAVE_BALANCE_UPDATED);
+      io.to(`user:${employee.userId.toString()}`).emit(SOCKET_EVENTS.NOTIFICATION_NEW);
+    }
+    io.to(`organization:${organizationId}`).emit(SOCKET_EVENTS.DASHBOARD_LEAVE_UPDATED, { pendingCount: await LeaveRequest.countDocuments({ organizationId: new Types.ObjectId(organizationId), status: 'PENDING' }) });
+  }
+
+  if (employee && employee.userId) {
+    await Notification.create({
+      organizationId: new Types.ObjectId(organizationId),
+      recipientId: employee.userId,
+      type: 'LEAVE_REQUEST_REJECTED',
+      title: 'Leave rejected',
+      message: `Your ${populated.leaveType} request from ${populated.startDate} to ${populated.endDate} was rejected.`,
+      entityType: 'LEAVE_REQUEST',
+      entityId: request._id,
+    });
+  }
+
+  return populated;
+}
+
+async function cancelLeaveRequest(organizationId, id, actor) {
+  const request = await LeaveRequest.findOne({ _id: id, organizationId: new Types.ObjectId(organizationId) });
+  if (!request) throw new AppError('Leave request not found', 404);
+  if (request.status === 'CANCELLED') throw new AppError('Leave request already cancelled', 400);
+
+  if (request.status === 'PENDING') {
+    const balance = await LeaveBalance.findOne({
+      organizationId: new Types.ObjectId(organizationId),
+      employeeId: new Types.ObjectId(request.employeeId),
+      leaveTypeId: new Types.ObjectId(request.leaveTypeId),
+      year: CURRENT_YEAR,
+    });
+    if (balance) {
+      balance.pendingDays -= request.numberOfDays;
+      if (request.status === 'APPROVED') balance.usedDays -= request.numberOfDays;
+      balance.remainingDays = balance.allocatedDays + balance.carriedForwardDays - balance.usedDays - balance.pendingDays;
+      await balance.save();
+    }
+  }
+
+  request.status = 'CANCELLED';
+  request.cancelledAt = new Date();
+  request.cancelledBy = actor._id;
+  await request.save();
+
+  const populated = await populateRequest(request.toObject());
+  const employee = await Employee.findById(request.employeeId).lean();
+  const io = getSocketInstance();
+  if (io) {
+    if (employee && employee.userId) {
+      io.to(`user:${employee.userId.toString()}`).emit(SOCKET_EVENTS.LEAVE_REQUEST_CANCELLED, populated);
+      io.to(`user:${employee.userId.toString()}`).emit(SOCKET_EVENTS.LEAVE_BALANCE_UPDATED);
+    }
+    io.to(`organization:${organizationId}`).emit(SOCKET_EVENTS.DASHBOARD_LEAVE_UPDATED, { pendingCount: await LeaveRequest.countDocuments({ organizationId: new Types.ObjectId(organizationId), status: 'PENDING' }) });
+  }
+
+  if (employee && employee.userId) {
+    await Notification.create({
+      organizationId: new Types.ObjectId(organizationId),
+      recipientId: employee.userId,
+      type: 'LEAVE_REQUEST_CANCELLED',
+      title: 'Leave cancelled',
+      message: `Your ${populated.leaveType} request from ${populated.startDate} to ${populated.endDate} was cancelled.`,
+      entityType: 'LEAVE_REQUEST',
+      entityId: request._id,
+    });
+  }
+
+  return populated;
+}
+
+module.exports = {
+  createLeaveRequest,
+  getLeaveRequests,
+  getMyLeaveRequests,
+  getLeaveRequestById,
+  approveLeaveRequest,
+  rejectLeaveRequest,
+  cancelLeaveRequest,
+  populateRequest,
+};

@@ -7,8 +7,8 @@
   "scripts": {
     "start": "node server.js",
     "predev": "sh scripts/predev.sh",
-    "dev": "nodemon server.js",
-    "dev:node": "node --watch server.js"
+    "dev": "node server.js",
+    "dev:watch": "node --watch server.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -22,6 +22,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.9.5",
     "morgan": "^1.10.0",
+    "socket.io": "^4.8.3",
     "ws": "^8.21.1"
   },
   "devDependencies": {

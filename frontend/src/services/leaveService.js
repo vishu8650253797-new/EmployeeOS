@@ -1,34 +1,27 @@
-import { mockRequest } from './api';
-import { LEAVE_REQUESTS, LEAVE_BALANCE_SUMMARY } from '../data/leaveRequests';
+import { leaveRequestService } from './leaveRequestService';
+import { leaveBalanceService } from './leaveBalanceService';
 
-// Leave service — currently backed by mock data.
-
-let leaveRequests = structuredClone(LEAVE_REQUESTS);
+// Leave service — proxies to REST APIs and normalizes data for UI compatibility.
 
 export const leaveService = {
   async getLeaveRequests(params = {}) {
-    let result = [...leaveRequests];
-    if (params.status && params.status !== 'all') {
-      result = result.filter((r) => r.status === params.status);
-    }
-    return mockRequest(result);
+    const status = params.status === 'all' || params.status === 'ALL' ? undefined : params.status;
+    const res = await leaveRequestService.getLeaveRequests({ ...params, status });
+    return res.data || [];
   },
 
   async getLeaveBalance() {
-    return mockRequest(LEAVE_BALANCE_SUMMARY);
+    const res = await leaveBalanceService.getMyLeaveBalances();
+    return res.data || [];
   },
 
   async approveLeave(id) {
-    const index = leaveRequests.findIndex((r) => r.id === id);
-    if (index === -1) throw new Error('Leave request not found');
-    leaveRequests[index] = { ...leaveRequests[index], status: 'Approved' };
-    return mockRequest(leaveRequests[index], 500);
+    const res = await leaveRequestService.approveLeaveRequest(id);
+    return res.data;
   },
 
   async rejectLeave(id, rejectionReason = '') {
-    const index = leaveRequests.findIndex((r) => r.id === id);
-    if (index === -1) throw new Error('Leave request not found');
-    leaveRequests[index] = { ...leaveRequests[index], status: 'Rejected', rejectionReason };
-    return mockRequest(leaveRequests[index], 500);
+    const res = await leaveRequestService.rejectLeaveRequest(id, rejectionReason);
+    return res.data;
   },
 };

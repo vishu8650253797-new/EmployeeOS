@@ -38,7 +38,10 @@ export const authService = {
   },
 
   async login({ email, password }) {
-    const response = await publicApi.post('/auth/login', { email, password });
+    const response = await publicApi.post('/auth/login', {
+      email: email?.toLowerCase().trim(),
+      password: password?.trim(),
+    });
     const user = normalizeUser(response.data);
     this.setAccessToken(response.data.accessToken);
     return user;

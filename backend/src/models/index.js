@@ -8,6 +8,11 @@ module.exports = {
   Department: require('./Department'),
   Attendance: require('./Attendance'),
   LeaveRequest: require('./LeaveRequest'),
-  // Role, Permission, Task, Document, PerformanceReview, Payroll,
-  // Notification, AuditLog — to be implemented in Phase 2+
+  LeaveType: require('./LeaveType'),
+  LeaveBalance: require('./LeaveBalance'),
+  Notification: require('./Notification'),
+  Project: require('./Project'),
+  Task: require('./Task'),
+  TaskComment: require('./TaskComment'),
+  TaskActivity: require('./TaskActivity'),
 };

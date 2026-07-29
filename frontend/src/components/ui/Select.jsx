@@ -9,10 +9,19 @@ export default function Select({
   placeholder,
   className = '',
   id: idProp,
+  onChange,
+  value,
+  disabled,
   ...props
 }) {
   const generatedId = useId();
   const id = idProp || generatedId;
+
+  const handleChange = (e) => {
+    if (onChange) {
+      onChange(e.target.value);
+    }
+  };
 
   return (
     <div className={className}>
@@ -25,6 +34,9 @@ export default function Select({
       <div className="relative">
         <select
           id={id}
+          value={value || ''}
+          onChange={handleChange}
+          disabled={disabled}
           aria-invalid={Boolean(error)}
           aria-describedby={error ? `${id}-error` : undefined}
           required={required}
@@ -35,10 +47,10 @@ export default function Select({
         >
           {placeholder && <option value="">{placeholder}</option>}
           {options.map((option) => {
-            const value = typeof option === 'string' ? option : option.value;
+            const optionValue = typeof option === 'string' ? option : option.value;
             const optionLabel = typeof option === 'string' ? option : option.label;
             return (
-              <option key={value} value={value}>
+              <option key={optionValue} value={optionValue}>
                 {optionLabel}
               </option>
             );

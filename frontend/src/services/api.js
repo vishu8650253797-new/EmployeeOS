@@ -6,9 +6,9 @@ import { authService } from './authService';
 // Attaches the in-memory access token and refreshes it automatically on 401.
 
 const api = axios.create({
-  baseURL:
-    import.meta.env.VITE_API_BASE_URL ||
-    (import.meta.env.DEV ? 'http://127.0.0.1:5100/api' : '/api'),
+  baseURL: import.meta.env.DEV
+    ? 'http://127.0.0.1:5100/api'
+    : (import.meta.env.VITE_API_BASE_URL || '/api'),
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,

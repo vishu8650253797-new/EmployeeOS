@@ -37,7 +37,6 @@ export default function Modal({ open, onClose, title, description, size = 'md', 
     }
 
     document.addEventListener('keydown', onKeyDown);
-    panelRef.current?.querySelector('button, input, select, textarea')?.focus();
 
     return () => {
       document.body.style.overflow = '';
