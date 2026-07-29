@@ -6,7 +6,7 @@ exports.getWorkload = async (req, res) => {
 };
 
 exports.getMyWorkload = async (req, res) => {
-  const employeeId = req.employeeId;
+  const employeeId = req.user.employeeId;
   const data = await workloadService.getMyWorkload(req.organizationId, employeeId);
   res.json({ success: true, data });
 };

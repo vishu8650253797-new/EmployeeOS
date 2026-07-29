@@ -26,6 +26,7 @@ export default function Button({
   disabled = false,
   className = '',
   type = 'button',
+  icon,
   ...props
 }) {
   return (
@@ -35,7 +36,7 @@ export default function Button({
       className={`focus-ring inline-flex items-center justify-center rounded-lg font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
       {...props}
     >
-      {loading && <Loader2 size={15} className="animate-spin" aria-hidden="true" />}
+      {loading ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : icon}
       {children}
     </button>
   );

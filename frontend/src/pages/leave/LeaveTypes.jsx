@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Layers, Plus, Pencil, Trash2 } from 'lucide-react';
 import { leaveTypeService } from '../../services/leaveTypeService';
 import { useFetch } from '../../hooks/useFetch';
@@ -74,10 +74,10 @@ export default function LeaveTypes() {
     setFormOpen(true);
   }
 
-  function update(field, value) {
+  const update = useCallback((field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => ({ ...prev, [field]: undefined }));
-  }
+  }, []);
 
   function validate() {
     const next = {};
@@ -260,7 +260,7 @@ export default function LeaveTypes() {
               value={form.name}
               error={errors.name}
               placeholder="Annual Leave"
-              onChange={(e) => update('name', e.target.value)}
+              onChange={(v) => update('name', v)}
             />
             <Input
               label="Code"
@@ -268,7 +268,8 @@ export default function LeaveTypes() {
               value={form.code}
               error={errors.code}
               placeholder="ANL"
-              onChange={(e) => update('code', e.target.value.toUpperCase())}
+              uppercase
+              onChange={(v) => update('code', v)}
             />
           </div>
 
@@ -280,7 +281,7 @@ export default function LeaveTypes() {
               required
               value={form.totalDays}
               error={errors.totalDays}
-              onChange={(e) => update('totalDays', e.target.value)}
+              onChange={(v) => update('totalDays', v)}
             />
             <Select
               label="Status"
@@ -289,23 +290,18 @@ export default function LeaveTypes() {
                 { value: 'INACTIVE', label: 'Inactive' },
               ]}
               value={form.status}
-              onChange={(e) => update('status', e.target.value)}
+              onChange={(v) => update('status', v)}
             />
           </div>
 
-          <div>
-            <label htmlFor="leave-type-description" className="mb-1.5 block text-[13px] font-medium text-ink-700">
-              Description
-            </label>
-            <textarea
-              id="leave-type-description"
-              rows={2}
-              value={form.description}
-              onChange={(e) => update('description', e.target.value)}
-              placeholder="Optional details about this leave type"
-              className="focus-ring w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm text-ink-900 transition-colors placeholder:text-ink-400 hover:border-ink-400"
-            />
-          </div>
+          <Input
+            label="Description"
+            value={form.description}
+            onChange={(v) => update('description', v)}
+            placeholder="Optional details about this leave type"
+            textarea
+            rows={2}
+          />
 
           <fieldset className="space-y-2.5 rounded-lg border border-line bg-canvas p-3">
             <legend className="px-1 text-xs font-medium text-ink-500">Options</legend>
@@ -342,7 +338,7 @@ export default function LeaveTypes() {
                 min="0"
                 label="Max carry forward days"
                 value={form.maxCarryForwardDays}
-                onChange={(e) => update('maxCarryForwardDays', e.target.value)}
+                onChange={(v) => update('maxCarryForwardDays', v)}
               />
             )}
           </fieldset>

@@ -219,14 +219,14 @@ export default function MyAttendance() {
           <Select
             label="Month"
             value={month}
-            onChange={(e) => setMonth(e.target.value)}
+            onChange={(v) => setMonth(v)}
             options={MONTHS}
             className="sm:w-44"
           />
           <Select
             label="Year"
             value={year}
-            onChange={(e) => setYear(e.target.value)}
+            onChange={(v) => setYear(v)}
             options={generateYears()}
             className="sm:w-32"
           />

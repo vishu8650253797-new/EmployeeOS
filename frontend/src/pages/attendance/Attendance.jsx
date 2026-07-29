@@ -145,13 +145,13 @@ export default function Attendance() {
             type="date"
             label="Date"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(v) => setDate(v)}
             className="sm:w-44"
           />
           <Select
             label="Department"
             value={departmentId}
-            onChange={(e) => setDepartmentId(e.target.value)}
+            onChange={(v) => setDepartmentId(v)}
             options={departmentOptions}
             placeholder="All departments"
             className="sm:w-48"
@@ -159,7 +159,7 @@ export default function Attendance() {
           <Select
             label="Status"
             value={status}
-            onChange={(e) => setStatus(e.target.value)}
+            onChange={(v) => setStatus(v)}
             options={statusOptions}
             placeholder="All statuses"
             className="sm:w-44"
@@ -168,7 +168,7 @@ export default function Attendance() {
             type="text"
             label="Search"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(v) => setSearch(v)}
             placeholder="Name, ID or email"
             icon={Search}
             className="sm:w-64"

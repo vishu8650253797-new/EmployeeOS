@@ -1,6 +1,9 @@
 const EmployeeGoal = require('../models/EmployeeGoal');
 const GoalProgress = require('../models/GoalProgress');
 const { getSocketInstance } = require('../socket/socketServer');
+const AppError = require('../utils/AppError');
+
+const ELEVATED_ROLES = ['SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'];
 
 exports.getGoals = async (organizationId, query = {}) => {
   const {
@@ -197,7 +200,7 @@ exports.deleteGoal = async (organizationId, goalId) => {
   return { success: true, message: 'Goal deleted' };
 };
 
-exports.updateGoalProgress = async (organizationId, goalId, progressData, userId) => {
+exports.updateGoalProgress = async (organizationId, goalId, progressData, actor) => {
   const goal = await EmployeeGoal.findOne({
     _id: goalId,
     organizationId
@@ -207,6 +210,12 @@ exports.updateGoalProgress = async (organizationId, goalId, progressData, userId
     throw new Error('Goal not found');
   }
 
+  const isOwner = actor.employeeId && actor.employeeId.toString() === goal.employeeId.toString();
+  if (!isOwner && !ELEVATED_ROLES.includes(actor.role)) {
+    throw new AppError('You are not authorized to update this goal\'s progress', 403);
+  }
+
+  const userId = actor._id;
   const { newValue, note } = progressData;
   const previousValue = goal.currentValue;
   

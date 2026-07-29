@@ -24,7 +24,10 @@ const userSchema = new Schema(
   { timestamps: true }
 );
 
-userSchema.index({ organizationId: 1, email: 1 }, { unique: true });
+// Email is globally unique: registration always creates a brand-new organization,
+// so the same email can never legitimately belong to more than one account —
+// a per-organization unique index would let login() match the wrong org's user.
+userSchema.index({ email: 1 }, { unique: true });
 
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();

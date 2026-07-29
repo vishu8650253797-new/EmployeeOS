@@ -1,8 +1,13 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
 
 export function useProjectSocket(projectId, handlers = {}) {
   const { socket } = useSocket();
+  const handlersRef = useRef(handlers);
+
+  useEffect(() => {
+    handlersRef.current = handlers;
+  });
 
   useEffect(() => {
     if (!socket || !projectId) return undefined;
@@ -22,27 +27,27 @@ export function useProjectSocket(projectId, handlers = {}) {
     if (!socket) return undefined;
 
     const eventHandlers = {
-      'project:created': handlers.onProjectCreated,
-      'project:updated': handlers.onProjectUpdated,
-      'project:deleted': handlers.onProjectDeleted,
-      'project:member-added': handlers.onMemberAdded,
-      'project:member-removed': handlers.onMemberRemoved,
-      'task:created': handlers.onTaskCreated,
-      'task:updated': handlers.onTaskUpdated,
-      'task:assigned': handlers.onTaskAssigned,
-      'task:status-changed': handlers.onStatusChanged,
-      'task:deleted': handlers.onTaskDeleted,
-      'task:comment-added': handlers.onCommentAdded,
+      'project:created': (data) => handlersRef.current.onProjectCreated?.(data),
+      'project:updated': (data) => handlersRef.current.onProjectUpdated?.(data),
+      'project:deleted': (data) => handlersRef.current.onProjectDeleted?.(data),
+      'project:member-added': (data) => handlersRef.current.onMemberAdded?.(data),
+      'project:member-removed': (data) => handlersRef.current.onMemberRemoved?.(data),
+      'task:created': (data) => handlersRef.current.onTaskCreated?.(data),
+      'task:updated': (data) => handlersRef.current.onTaskUpdated?.(data),
+      'task:assigned': (data) => handlersRef.current.onTaskAssigned?.(data),
+      'task:status-changed': (data) => handlersRef.current.onStatusChanged?.(data),
+      'task:deleted': (data) => handlersRef.current.onTaskDeleted?.(data),
+      'task:comment-added': (data) => handlersRef.current.onCommentAdded?.(data),
     };
 
     Object.entries(eventHandlers).forEach(([event, handler]) => {
-      if (handler) socket.on(event, handler);
+      socket.on(event, handler);
     });
 
     return () => {
       Object.entries(eventHandlers).forEach(([event, handler]) => {
-        if (handler) socket.off(event, handler);
+        socket.off(event, handler);
       });
     };
-  }, [socket, handlers]);
+  }, [socket]);
 }

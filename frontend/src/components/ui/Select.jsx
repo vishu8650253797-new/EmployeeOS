@@ -19,7 +19,11 @@ export default function Select({
 
   const handleChange = (e) => {
     if (onChange) {
-      onChange(e.target.value);
+      if (e.target.multiple) {
+        onChange(Array.from(e.target.selectedOptions, (option) => option.value));
+      } else {
+        onChange(e.target.value);
+      }
     }
   };
 

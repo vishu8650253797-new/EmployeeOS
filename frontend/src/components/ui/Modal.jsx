@@ -11,6 +11,11 @@ const SIZES = {
 
 export default function Modal({ open, onClose, title, description, size = 'md', children, footer }) {
   const panelRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   useEffect(() => {
     if (!open) return undefined;
@@ -18,7 +23,7 @@ export default function Modal({ open, onClose, title, description, size = 'md', 
     document.body.style.overflow = 'hidden';
 
     function onKeyDown(event) {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') onCloseRef.current();
       if (event.key === 'Tab' && panelRef.current) {
         const focusables = panelRef.current.querySelectorAll(
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
@@ -43,7 +48,7 @@ export default function Modal({ open, onClose, title, description, size = 'md', 
       document.removeEventListener('keydown', onKeyDown);
       previouslyFocused?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

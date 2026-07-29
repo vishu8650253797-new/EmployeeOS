@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, FolderKanban, List, Users, Calendar, TrendingUp, Plus, MoreHorizontal, Edit, Trash2, UserPlus, UserMinus } from 'lucide-react';
 import { projectService } from '../../services/projectService';
 import { taskService } from '../../services/taskService';
+import { employeeService } from '../../services/employeeService';
 import { useFetch } from '../../hooks/useFetch';
 import { useToast } from '../../context/ToastContext';
 import { fullName } from '../../utils/format';
@@ -30,7 +31,7 @@ export default function ProjectDetails() {
 
   const { data: project, loading, error, refetch } = useFetch(() => projectService.getProjectById(id), [id]);
   const { data: stats } = useFetch(() => projectService.getProjectStatistics(id), [id]);
-  const { data: empResponse } = useFetch(() => fetch('/api/employees?limit=1000').then(r => r.json()), []);
+  const { data: empResponse } = useFetch(() => employeeService.getEmployees({ limit: 1000 }), []);
   const employees = empResponse?.data || [];
   const employeeOptions = employees.map((e) => ({ value: e.id, label: fullName(e) }));
 
@@ -100,20 +101,20 @@ export default function ProjectDetails() {
               </Button>
             </Link>
             <Dropdown
-              trigger={
+              trigger={() => (
                 <Button variant="ghost" icon={<MoreHorizontal />}>
                   More
                 </Button>
-              }
+              )}
             >
-              <DropdownItem onClick={() => navigate(`/projects/${id}/edit`)} icon={<Edit />}>
+              <DropdownItem onClick={() => navigate(`/projects/${id}/edit`)} icon={Edit}>
                 Edit Project
               </DropdownItem>
-              <DropdownItem onClick={() => setMemberModalOpen(true)} icon={<UserPlus />}>
+              <DropdownItem onClick={() => setMemberModalOpen(true)} icon={UserPlus}>
                 Add Member
               </DropdownItem>
               <DropdownSeparator />
-              <DropdownItem onClick={() => setDeleteTarget(project)} icon={<Trash2 />} className="text-red-600">
+              <DropdownItem onClick={() => setDeleteTarget(project)} icon={Trash2} className="text-red-600">
                 Delete Project
               </DropdownItem>
             </Dropdown>

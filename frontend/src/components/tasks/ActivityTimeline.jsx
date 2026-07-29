@@ -1,4 +1,5 @@
 import { History } from 'lucide-react';
+import { taskService } from '../../services/taskService';
 import { useFetch } from '../../hooks/useFetch';
 import { fullName } from '../../utils/format';
 import Avatar from '../ui/Avatar';
@@ -20,7 +21,7 @@ const ACTION_LABELS = {
 
 export default function ActivityTimeline({ taskId }) {
   const { data, loading } = useFetch(
-    () => fetch(`/api/tasks/${taskId}/activities`).then(r => r.json()),
+    () => taskService.getTaskActivities(taskId),
     [taskId]
   );
   const activities = data?.data || [];
@@ -36,9 +37,9 @@ export default function ActivityTimeline({ taskId }) {
 
       {activities.length === 0 ? (
         <EmptyState
-          icon={<History className="w-8 h-8" />}
+          icon={History}
           title="No activity yet"
-          description="Activity will appear here as the task progresses"
+          message="Activity will appear here as the task progresses"
         />
       ) : (
         <div className="space-y-4">

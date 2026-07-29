@@ -66,7 +66,7 @@ export default function ForgotPassword() {
           placeholder="you@company.com"
           required
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(v) => setEmail(v)}
           error={error}
         />
         <Button type="submit" size="lg" loading={loading} className="w-full">

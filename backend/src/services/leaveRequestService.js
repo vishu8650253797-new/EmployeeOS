@@ -7,6 +7,13 @@ const { getSocketInstance } = require('../socket/socketServer');
 const leaveBalanceService = require('./leaveBalanceService');
 
 const CURRENT_YEAR = new Date().getFullYear();
+const ELEVATED_ROLES = ['SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'];
+
+function assertOwnerOrElevated(actor, employeeId) {
+  if (ELEVATED_ROLES.includes(actor.role)) return;
+  if (actor.employeeId && actor.employeeId.toString() === employeeId.toString()) return;
+  throw new AppError('You are not authorized to access this leave request', 403);
+}
 
 function toLeaveDTO(request, employee, leaveType, reviewer) {
   const emp = employee || {};
@@ -84,6 +91,8 @@ async function findEmployeesToNotify(organizationId, requestEmployeeId) {
 }
 
 async function createLeaveRequest(organizationId, payload, actor) {
+  assertOwnerOrElevated(actor, payload.employeeId);
+
   const employee = await Employee.findById(payload.employeeId).lean();
   if (!employee || employee.organizationId.toString() !== organizationId.toString()) throw new AppError('Employee not found', 404);
 
@@ -103,33 +112,48 @@ async function createLeaveRequest(organizationId, payload, actor) {
     CURRENT_YEAR
   );
 
-  const balance = await LeaveBalance.findOne({
+  const balanceQuery = {
     organizationId: new Types.ObjectId(organizationId),
     employeeId: new Types.ObjectId(payload.employeeId),
     leaveTypeId: new Types.ObjectId(payload.leaveTypeId),
     year: CURRENT_YEAR,
-  });
-  if (!balance) throw new AppError('Leave balance not found for this leave type', 400);
+  };
   const required = halfDay ? numberOfDays : numberOfDays;
-  if (balance.remainingDays < required) throw new AppError('Insufficient leave balance', 400);
 
-  const request = await LeaveRequest.create({
-    organizationId: new Types.ObjectId(organizationId),
-    employeeId: new Types.ObjectId(payload.employeeId),
-    leaveTypeId: new Types.ObjectId(payload.leaveTypeId),
-    startDate: new Date(payload.startDate),
-    endDate: new Date(payload.endDate),
-    numberOfDays,
-    durationType: halfDay ? 'HALF_DAY' : 'FULL_DAY',
-    reason: payload.reason || '',
-    status: 'PENDING',
-    approvalLevel: 'MANAGER',
-    submittedAt: new Date(),
-  });
+  // Atomically reserve the days: the `remainingDays: { $gte }` guard makes this
+  // safe against concurrent submissions racing on the same balance (e.g. a
+  // double-click), which a separate read-then-write could overdraw.
+  const reservedBalance = await LeaveBalance.findOneAndUpdate(
+    { ...balanceQuery, remainingDays: { $gte: required } },
+    { $inc: { pendingDays: numberOfDays, remainingDays: -numberOfDays } },
+    { new: true }
+  );
+  if (!reservedBalance) {
+    const exists = await LeaveBalance.exists(balanceQuery);
+    if (!exists) throw new AppError('Leave balance not found for this leave type', 400);
+    throw new AppError('Insufficient leave balance', 400);
+  }
 
-  balance.pendingDays += numberOfDays;
-  balance.remainingDays = balance.allocatedDays + balance.carriedForwardDays - balance.usedDays - balance.pendingDays;
-  await balance.save();
+  let request;
+  try {
+    request = await LeaveRequest.create({
+      organizationId: new Types.ObjectId(organizationId),
+      employeeId: new Types.ObjectId(payload.employeeId),
+      leaveTypeId: new Types.ObjectId(payload.leaveTypeId),
+      startDate: new Date(payload.startDate),
+      endDate: new Date(payload.endDate),
+      numberOfDays,
+      durationType: halfDay ? 'HALF_DAY' : 'FULL_DAY',
+      reason: payload.reason || '',
+      status: 'PENDING',
+      approvalLevel: 'MANAGER',
+      submittedAt: new Date(),
+    });
+  } catch (err) {
+    // roll back the reservation if request creation failed
+    await LeaveBalance.updateOne(balanceQuery, { $inc: { pendingDays: -numberOfDays, remainingDays: numberOfDays } });
+    throw err;
+  }
 
   const populated = await populateRequest(request);
 
@@ -197,9 +221,10 @@ async function getMyLeaveRequests(organizationId, employeeId, filters = {}) {
   return { data: populated };
 }
 
-async function getLeaveRequestById(organizationId, id) {
+async function getLeaveRequestById(organizationId, id, actor) {
   const request = await LeaveRequest.findOne({ _id: id, organizationId: new Types.ObjectId(organizationId) }).lean();
   if (!request) throw new AppError('Leave request not found', 404);
+  assertOwnerOrElevated(actor, request.employeeId);
   return populateRequest(request);
 }
 
@@ -208,18 +233,15 @@ async function approveLeaveRequest(organizationId, id, actor) {
   if (!request) throw new AppError('Leave request not found', 404);
   if (request.status !== 'PENDING') throw new AppError('Only pending requests can be approved', 400);
 
-  const balance = await LeaveBalance.findOne({
-    organizationId: new Types.ObjectId(organizationId),
-    employeeId: new Types.ObjectId(request.employeeId),
-    leaveTypeId: new Types.ObjectId(request.leaveTypeId),
-    year: CURRENT_YEAR,
-  });
-  if (balance) {
-    balance.pendingDays -= request.numberOfDays;
-    balance.usedDays += request.numberOfDays;
-    balance.remainingDays = balance.allocatedDays + balance.carriedForwardDays - balance.usedDays - balance.pendingDays;
-    await balance.save();
-  }
+  await LeaveBalance.updateOne(
+    {
+      organizationId: new Types.ObjectId(organizationId),
+      employeeId: new Types.ObjectId(request.employeeId),
+      leaveTypeId: new Types.ObjectId(request.leaveTypeId),
+      year: CURRENT_YEAR,
+    },
+    { $inc: { pendingDays: -request.numberOfDays, usedDays: request.numberOfDays } }
+  );
 
   request.status = 'APPROVED';
   request.reviewedAt = new Date();
@@ -258,17 +280,15 @@ async function rejectLeaveRequest(organizationId, id, actor, rejectionReason) {
   if (!request) throw new AppError('Leave request not found', 404);
   if (request.status !== 'PENDING') throw new AppError('Only pending requests can be rejected', 400);
 
-  const balance = await LeaveBalance.findOne({
-    organizationId: new Types.ObjectId(organizationId),
-    employeeId: new Types.ObjectId(request.employeeId),
-    leaveTypeId: new Types.ObjectId(request.leaveTypeId),
-    year: CURRENT_YEAR,
-  });
-  if (balance) {
-    balance.pendingDays -= request.numberOfDays;
-    balance.remainingDays = balance.allocatedDays + balance.carriedForwardDays - balance.usedDays - balance.pendingDays;
-    await balance.save();
-  }
+  await LeaveBalance.updateOne(
+    {
+      organizationId: new Types.ObjectId(organizationId),
+      employeeId: new Types.ObjectId(request.employeeId),
+      leaveTypeId: new Types.ObjectId(request.leaveTypeId),
+      year: CURRENT_YEAR,
+    },
+    { $inc: { pendingDays: -request.numberOfDays, remainingDays: request.numberOfDays } }
+  );
 
   request.status = 'REJECTED';
   request.reviewedAt = new Date();
@@ -306,21 +326,22 @@ async function rejectLeaveRequest(organizationId, id, actor, rejectionReason) {
 async function cancelLeaveRequest(organizationId, id, actor) {
   const request = await LeaveRequest.findOne({ _id: id, organizationId: new Types.ObjectId(organizationId) });
   if (!request) throw new AppError('Leave request not found', 404);
+  assertOwnerOrElevated(actor, request.employeeId);
   if (request.status === 'CANCELLED') throw new AppError('Leave request already cancelled', 400);
 
-  if (request.status === 'PENDING') {
-    const balance = await LeaveBalance.findOne({
-      organizationId: new Types.ObjectId(organizationId),
-      employeeId: new Types.ObjectId(request.employeeId),
-      leaveTypeId: new Types.ObjectId(request.leaveTypeId),
-      year: CURRENT_YEAR,
-    });
-    if (balance) {
-      balance.pendingDays -= request.numberOfDays;
-      if (request.status === 'APPROVED') balance.usedDays -= request.numberOfDays;
-      balance.remainingDays = balance.allocatedDays + balance.carriedForwardDays - balance.usedDays - balance.pendingDays;
-      await balance.save();
-    }
+  if (request.status === 'PENDING' || request.status === 'APPROVED') {
+    const inc = request.status === 'PENDING'
+      ? { pendingDays: -request.numberOfDays, remainingDays: request.numberOfDays }
+      : { usedDays: -request.numberOfDays, remainingDays: request.numberOfDays };
+    await LeaveBalance.updateOne(
+      {
+        organizationId: new Types.ObjectId(organizationId),
+        employeeId: new Types.ObjectId(request.employeeId),
+        leaveTypeId: new Types.ObjectId(request.leaveTypeId),
+        year: CURRENT_YEAR,
+      },
+      { $inc: inc }
+    );
   }
 
   request.status = 'CANCELLED';

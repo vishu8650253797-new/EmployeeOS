@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { employeeService } from '../../services/employeeService';
 import { departmentService } from '../../services/departmentService';
@@ -90,15 +90,15 @@ export default function EmployeeForm() {
     };
   }, [id, isEdit]);
 
-  function setField(name, value) {
+  const setField = useCallback((name, value) => {
     setForm((f) => ({ ...f, [name]: value }));
     setErrors((e) => ({ ...e, [name]: undefined }));
-  }
+  }, []);
 
-  function setNested(parent, name, value) {
+  const setNested = useCallback((parent, name, value) => {
     setForm((f) => ({ ...f, [parent]: { ...f[parent], [name]: value } }));
     setErrors((e) => ({ ...e, [parent]: undefined }));
-  }
+  }, []);
 
   function validate() {
     const next = {};
@@ -201,7 +201,7 @@ export default function EmployeeForm() {
                   label="First name"
                   required
                   value={form.firstName}
-                  onChange={(e) => setField('firstName', e.target.value)}
+                  onChange={(v) => setField('firstName', v)}
                   error={errors.firstName}
                   placeholder="e.g. Aarav"
                 />
@@ -209,7 +209,7 @@ export default function EmployeeForm() {
                   label="Last name"
                   required
                   value={form.lastName}
-                  onChange={(e) => setField('lastName', e.target.value)}
+                  onChange={(v) => setField('lastName', v)}
                   error={errors.lastName}
                   placeholder="e.g. Sharma"
                 />
@@ -218,7 +218,7 @@ export default function EmployeeForm() {
                   type="email"
                   required
                   value={form.email}
-                  onChange={(e) => setField('email', e.target.value)}
+                  onChange={(v) => setField('email', v)}
                   error={errors.email}
                   placeholder="name@company.com"
                 />
@@ -226,7 +226,7 @@ export default function EmployeeForm() {
                   label="Phone"
                   type="tel"
                   value={form.phone}
-                  onChange={(e) => setField('phone', e.target.value)}
+                  onChange={(v) => setField('phone', v)}
                   error={errors.phone}
                   placeholder="+91 98XXX XXXXX"
                 />
@@ -234,13 +234,13 @@ export default function EmployeeForm() {
                   label="Date of birth"
                   type="date"
                   value={form.dateOfBirth}
-                  onChange={(e) => setField('dateOfBirth', e.target.value)}
+                  onChange={(v) => setField('dateOfBirth', v)}
                   error={errors.dateOfBirth}
                 />
                 <Select
                   label="Gender"
                   value={form.gender}
-                  onChange={(e) => setField('gender', e.target.value)}
+                  onChange={(v) => setField('gender', v)}
                   options={['Male', 'Female', 'Other', 'Prefer not to say']}
                   placeholder="Select gender"
                 />
@@ -255,7 +255,7 @@ export default function EmployeeForm() {
                 <Select
                   label="Department"
                   value={form.departmentId}
-                  onChange={(e) => setField('departmentId', e.target.value)}
+                  onChange={(v) => setField('departmentId', v)}
                   error={errors.departmentId}
                   options={departmentOptions}
                   placeholder="Select department"
@@ -264,7 +264,7 @@ export default function EmployeeForm() {
                   label="Job title"
                   required
                   value={form.jobTitle}
-                  onChange={(e) => setField('jobTitle', e.target.value)}
+                  onChange={(v) => setField('jobTitle', v)}
                   error={errors.jobTitle}
                   placeholder="e.g. Software Engineer"
                 />
@@ -272,14 +272,14 @@ export default function EmployeeForm() {
                   label="Role"
                   required
                   value={form.role}
-                  onChange={(e) => setField('role', e.target.value)}
+                  onChange={(v) => setField('role', v)}
                   error={errors.role}
                   options={Object.entries(ROLES).map(([value, label]) => ({ value, label }))}
                 />
                 <Select
                   label="Employment type"
                   value={form.employmentType}
-                  onChange={(e) => setField('employmentType', e.target.value)}
+                  onChange={(v) => setField('employmentType', v)}
                   options={EMPLOYMENT_TYPES}
                 />
                 <Input
@@ -287,19 +287,19 @@ export default function EmployeeForm() {
                   type="date"
                   required
                   value={form.joiningDate}
-                  onChange={(e) => setField('joiningDate', e.target.value)}
+                  onChange={(v) => setField('joiningDate', v)}
                   error={errors.joiningDate}
                 />
                 <Select
                   label="Status"
                   value={form.status}
-                  onChange={(e) => setField('status', e.target.value)}
+                  onChange={(v) => setField('status', v)}
                   options={EMPLOYEE_STATUSES}
                 />
                 <Input
                   label="Reporting manager"
                   value={form.manager}
-                  onChange={(e) => setField('manager', e.target.value)}
+                  onChange={(v) => setField('manager', v)}
                   placeholder="e.g. Rohan Verma"
                   className="sm:col-span-2"
                 />
@@ -313,28 +313,28 @@ export default function EmployeeForm() {
               <Input
                 label="Street"
                 value={form.address.street}
-                onChange={(e) => setNested('address', 'street', e.target.value)}
+                onChange={(v) => setNested('address', 'street', v)}
                 className="sm:col-span-2"
               />
               <Input
                 label="City"
                 value={form.address.city}
-                onChange={(e) => setNested('address', 'city', e.target.value)}
+                onChange={(v) => setNested('address', 'city', v)}
               />
               <Input
                 label="State / Province"
                 value={form.address.state}
-                onChange={(e) => setNested('address', 'state', e.target.value)}
+                onChange={(v) => setNested('address', 'state', v)}
               />
               <Input
                 label="Country"
                 value={form.address.country}
-                onChange={(e) => setNested('address', 'country', e.target.value)}
+                onChange={(v) => setNested('address', 'country', v)}
               />
               <Input
                 label="Postal code"
                 value={form.address.postalCode}
-                onChange={(e) => setNested('address', 'postalCode', e.target.value)}
+                onChange={(v) => setNested('address', 'postalCode', v)}
               />
             </div>
           </Card>
@@ -345,18 +345,18 @@ export default function EmployeeForm() {
               <Input
                 label="Contact name"
                 value={form.emergencyContact.name}
-                onChange={(e) => setNested('emergencyContact', 'name', e.target.value)}
+                onChange={(v) => setNested('emergencyContact', 'name', v)}
               />
               <Input
                 label="Relationship"
                 value={form.emergencyContact.relationship}
-                onChange={(e) => setNested('emergencyContact', 'relationship', e.target.value)}
+                onChange={(v) => setNested('emergencyContact', 'relationship', v)}
               />
               <Input
                 label="Phone"
                 type="tel"
                 value={form.emergencyContact.phone}
-                onChange={(e) => setNested('emergencyContact', 'phone', e.target.value)}
+                onChange={(v) => setNested('emergencyContact', 'phone', v)}
                 className="sm:col-span-2"
               />
             </div>

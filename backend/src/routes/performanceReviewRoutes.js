@@ -6,10 +6,10 @@ const performanceReviewController = require('../controllers/performanceReviewCon
 
 const router = Router();
 
-router.get('/', authMiddleware, asyncHandler(performanceReviewController.getReviews));
+router.get('/', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'), asyncHandler(performanceReviewController.getReviews));
 router.get('/my', authMiddleware, asyncHandler(performanceReviewController.getMyReviews));
-router.get('/employee/:employeeId', authMiddleware, asyncHandler(performanceReviewController.getEmployeeReviews));
-router.get('/cycle/:cycleId', authMiddleware, asyncHandler(performanceReviewController.getCycleReviews));
+router.get('/employee/:employeeId', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'), asyncHandler(performanceReviewController.getEmployeeReviews));
+router.get('/cycle/:cycleId', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'), asyncHandler(performanceReviewController.getCycleReviews));
 router.get('/:id', authMiddleware, asyncHandler(performanceReviewController.getReviewById));
 router.post('/', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'), asyncHandler(performanceReviewController.createReview));
 router.put('/:id', authMiddleware, asyncHandler(performanceReviewController.updateReview));

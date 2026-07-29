@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { leaveTypeService } from '../../services/leaveTypeService';
 import { leaveRequestService } from '../../services/leaveRequestService';
 import { employeeService } from '../../services/employeeService';
@@ -68,10 +68,10 @@ export default function LeaveRequestForm({ open, onClose, onSuccess, employeeId:
     return form.durationType === 'HALF_DAY' && allowHalfDay ? days * 0.5 : days;
   }, [form.startDate, form.endDate, form.durationType, allowHalfDay]);
 
-  function update(field, value) {
+  const update = useCallback((field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => ({ ...prev, [field]: undefined }));
-  }
+  }, []);
 
   function validate() {
     const next = {};
@@ -146,7 +146,7 @@ export default function LeaveRequestForm({ open, onClose, onSuccess, employeeId:
             options={employeeOptions}
             value={form.employeeId}
             error={errors.employeeId}
-            onChange={(e) => update('employeeId', e.target.value)}
+            onChange={(v) => update('employeeId', v)}
           />
         )}
 
@@ -157,7 +157,7 @@ export default function LeaveRequestForm({ open, onClose, onSuccess, employeeId:
           options={leaveTypeOptions}
           value={form.leaveTypeId}
           error={errors.leaveTypeId}
-          onChange={(e) => update('leaveTypeId', e.target.value)}
+          onChange={(v) => update('leaveTypeId', v)}
         />
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -167,7 +167,7 @@ export default function LeaveRequestForm({ open, onClose, onSuccess, employeeId:
             required
             value={form.startDate}
             error={errors.startDate}
-            onChange={(e) => update('startDate', e.target.value)}
+            onChange={(v) => update('startDate', v)}
           />
           <Input
             type="date"
@@ -175,7 +175,7 @@ export default function LeaveRequestForm({ open, onClose, onSuccess, employeeId:
             required
             value={form.endDate}
             error={errors.endDate}
-            onChange={(e) => update('endDate', e.target.value)}
+            onChange={(v) => update('endDate', v)}
           />
         </div>
 
@@ -187,23 +187,18 @@ export default function LeaveRequestForm({ open, onClose, onSuccess, employeeId:
               { value: 'HALF_DAY', label: 'Half day' },
             ]}
             value={form.durationType}
-            onChange={(e) => update('durationType', e.target.value)}
+            onChange={(v) => update('durationType', v)}
           />
         )}
 
-        <div>
-          <label htmlFor="leave-reason" className="mb-1.5 block text-[13px] font-medium text-ink-700">
-            Reason
-          </label>
-          <textarea
-            id="leave-reason"
-            rows={3}
-            value={form.reason}
-            onChange={(e) => update('reason', e.target.value)}
-            placeholder="Briefly describe the reason for your leave"
-            className="focus-ring w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm text-ink-900 transition-colors placeholder:text-ink-400 hover:border-ink-400"
-          />
-        </div>
+        <Input
+          label="Reason"
+          value={form.reason}
+          onChange={(v) => update('reason', v)}
+          placeholder="Briefly describe the reason for your leave"
+          textarea
+          rows={3}
+        />
 
         {estimatedDays > 0 && (
           <p className="rounded-lg border border-line bg-canvas px-3 py-2 text-[13px] text-ink-700">

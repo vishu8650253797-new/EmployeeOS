@@ -122,7 +122,7 @@ async function createTask(organizationId, payload, userId, reporterEmployeeId) {
     const employees = await Employee.find({
       _id: { $in: payload.assigneeIds },
       organizationId: new Types.ObjectId(organizationId),
-      status: 'active',
+      status: 'ACTIVE',
     });
     if (employees.length !== payload.assigneeIds.length) {
       throw new AppError('One or more assignees not found or inactive', 404);
@@ -170,7 +170,7 @@ async function updateTask(organizationId, id, payload) {
     const employees = await Employee.find({
       _id: { $in: payload.assigneeIds },
       organizationId: new Types.ObjectId(organizationId),
-      status: 'active',
+      status: 'ACTIVE',
     });
     if (employees.length !== payload.assigneeIds.length) {
       throw new AppError('One or more assignees not found or inactive', 404);
@@ -259,7 +259,7 @@ async function assignTask(organizationId, id, assigneeIds) {
   const employees = await Employee.find({
     _id: { $in: assigneeIds },
     organizationId: new Types.ObjectId(organizationId),
-    status: 'active',
+    status: 'ACTIVE',
   });
   if (employees.length !== assigneeIds.length) {
     throw new AppError('One or more assignees not found or inactive', 404);

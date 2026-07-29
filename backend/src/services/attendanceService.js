@@ -123,7 +123,7 @@ async function checkIn(user) {
 
   const result = toAttendanceDTO(await populateRecord(record._id), settings.timeZone);
   const io = getSocketInstance();
-  if (io) io.emit(SOCKET_EVENTS.ATTENDANCE_UPDATED, result);
+  if (io) io.to(`organization:${user.organizationId}`).emit(SOCKET_EVENTS.ATTENDANCE_UPDATED, result);
   return result;
 }
 
@@ -168,7 +168,7 @@ async function checkOut(user) {
   await record.save();
   const result = toAttendanceDTO(await populateRecord(record._id), settings.timeZone);
   const io = getSocketInstance();
-  if (io) io.emit(SOCKET_EVENTS.ATTENDANCE_UPDATED, result);
+  if (io) io.to(`organization:${user.organizationId}`).emit(SOCKET_EVENTS.ATTENDANCE_UPDATED, result);
   return result;
 }
 
@@ -541,11 +541,12 @@ async function getDepartmentStats(organizationId, departmentId, query = {}) {
   };
 }
 
-async function getEmployeeSummary(organizationId, employeeId, query = {}) {
+async function getEmployeeSummary(organizationId, employeeId, query = {}, user) {
   const settings = await getAttendanceSettings(organizationId);
   const organizationIdObj = new Types.ObjectId(organizationId);
   const employee = await Employee.findOne({ _id: employeeId, organizationId: organizationIdObj }).lean();
   if (!employee) throw new AppError('Employee not found', 404);
+  if (!canViewEmployee(user, employee)) throw new AppError('You are not authorized to view this attendance data', 403);
 
   const { startDate, endDate } = query;
   const filter = { organizationId: organizationIdObj, employeeId: employee._id };

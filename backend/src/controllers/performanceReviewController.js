@@ -31,7 +31,7 @@ exports.createReview = async (req, res) => {
 };
 
 exports.updateReview = async (req, res) => {
-  const data = await performanceReviewService.updateReview(req.organizationId, req.params.id, req.body);
+  const data = await performanceReviewService.updateReview(req.organizationId, req.params.id, req.body, req.user);
   res.json({ success: true, message: 'Performance review updated', data });
 };
 

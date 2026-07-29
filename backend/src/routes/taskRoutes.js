@@ -14,5 +14,6 @@ router.put('/:id', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN', 'MANAGER
 router.delete('/:id', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'), getById, asyncHandler(taskController.deleteTask));
 router.patch('/:id/status', authMiddleware, statusUpdate, asyncHandler(taskController.updateTaskStatus));
 router.patch('/:id/assign', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'), assign, asyncHandler(taskController.assignTask));
+router.get('/:id/activities', authMiddleware, getById, asyncHandler(taskController.getTaskActivities));
 
 module.exports = router;

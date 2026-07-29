@@ -6,10 +6,10 @@ const goalController = require('../controllers/goalController');
 
 const router = Router();
 
-router.get('/', authMiddleware, asyncHandler(goalController.getGoals));
+router.get('/', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'), asyncHandler(goalController.getGoals));
 router.get('/my', authMiddleware, asyncHandler(goalController.getMyGoals));
-router.get('/employee/:employeeId', authMiddleware, asyncHandler(goalController.getEmployeeGoals));
-router.get('/cycle/:cycleId', authMiddleware, asyncHandler(goalController.getCycleGoals));
+router.get('/employee/:employeeId', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'), asyncHandler(goalController.getEmployeeGoals));
+router.get('/cycle/:cycleId', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'), asyncHandler(goalController.getCycleGoals));
 router.get('/:id', authMiddleware, asyncHandler(goalController.getGoalById));
 router.get('/:id/progress-history', authMiddleware, asyncHandler(goalController.getGoalProgressHistory));
 router.post('/', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'), asyncHandler(goalController.createGoal));

@@ -25,7 +25,7 @@ exports.getEmployeeLeaveRequests = async (req, res) => {
 };
 
 exports.getLeaveRequestById = async (req, res) => {
-  const data = await leaveRequestService.getLeaveRequestById(req.organizationId, req.params.id);
+  const data = await leaveRequestService.getLeaveRequestById(req.organizationId, req.params.id, req.user);
   res.json({ success: true, data });
 };
 

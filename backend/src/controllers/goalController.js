@@ -41,7 +41,7 @@ exports.deleteGoal = async (req, res) => {
 };
 
 exports.updateGoalProgress = async (req, res) => {
-  const data = await goalService.updateGoalProgress(req.organizationId, req.params.id, req.body, req.user._id);
+  const data = await goalService.updateGoalProgress(req.organizationId, req.params.id, req.body, req.user);
   res.json({ success: true, message: 'Goal progress updated', data });
 };
 

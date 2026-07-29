@@ -1,4 +1,5 @@
 const taskService = require('../services/taskService');
+const taskActivityService = require('../services/taskActivityService');
 
 exports.getTasks = async (req, res) => {
   const { data, pagination } = await taskService.getTasks(req.organizationId, req.query);
@@ -11,7 +12,7 @@ exports.getTaskById = async (req, res) => {
 };
 
 exports.createTask = async (req, res) => {
-  const reporterEmployeeId = req.employeeId;
+  const reporterEmployeeId = req.user.employeeId;
   const data = await taskService.createTask(req.organizationId, req.body, req.user._id, reporterEmployeeId);
   res.status(201).json({ success: true, message: 'Task created', data });
 };
@@ -36,4 +37,9 @@ exports.assignTask = async (req, res) => {
   const { assigneeIds } = req.body;
   const data = await taskService.assignTask(req.organizationId, req.params.id, assigneeIds);
   res.json({ success: true, message: 'Task assigned', data });
+};
+
+exports.getTaskActivities = async (req, res) => {
+  const { data, pagination } = await taskActivityService.getTaskActivities(req.organizationId, req.params.id, req.query);
+  res.json({ success: true, data, pagination });
 };

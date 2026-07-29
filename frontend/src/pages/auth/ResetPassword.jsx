@@ -58,7 +58,7 @@ export default function ResetPassword() {
             placeholder="At least 8 characters"
             required
             value={form.password}
-            onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+            onChange={(v) => setForm((f) => ({ ...f, password: v }))}
             error={errors.password}
             hint={!errors.password ? 'Use 8+ characters with a mix of letters and numbers.' : undefined}
           />
@@ -79,7 +79,7 @@ export default function ResetPassword() {
           placeholder="Re-enter your password"
           required
           value={form.confirm}
-          onChange={(e) => setForm((f) => ({ ...f, confirm: e.target.value }))}
+          onChange={(v) => setForm((f) => ({ ...f, confirm: v }))}
           error={errors.confirm}
         />
 

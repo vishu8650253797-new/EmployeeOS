@@ -47,7 +47,7 @@ const update = [
   body('lastName').optional().trim().notEmpty().withMessage('Last name cannot be empty'),
   body('email').optional().isEmail().normalizeEmail().withMessage('Valid email is required'),
   body('jobTitle').optional().trim().notEmpty().withMessage('Job title cannot be empty'),
-  body('joiningDate').optional().isISO8601().toDate().withMessage('Valid joining date required'),
+  body('joiningDate').optional({ checkFalsy: true }).isISO8601().toDate().withMessage('Valid joining date required'),
   body('departmentId')
     .optional({ checkFalsy: true })
     .isMongoId()

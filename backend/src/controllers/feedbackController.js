@@ -21,7 +21,7 @@ exports.createFeedback = async (req, res) => {
 };
 
 exports.updateFeedback = async (req, res) => {
-  const data = await feedbackService.updateFeedback(req.organizationId, req.params.id, req.body);
+  const data = await feedbackService.updateFeedback(req.organizationId, req.params.id, req.body, req.user);
   res.json({ success: true, message: 'Feedback updated', data });
 };
 

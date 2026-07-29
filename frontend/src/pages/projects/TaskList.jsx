@@ -81,10 +81,11 @@ export default function TaskList() {
 
       {tasks.length === 0 ? (
         <EmptyState
-          icon={<List className="w-12 h-12" />}
+          icon={List}
           title="No tasks found"
-          description={search ? 'Try adjusting your search or filters' : 'Create your first task to start tracking work'}
-          action={search ? null : <Button icon={<Plus />} onClick={() => navigate(`/projects/${id}/tasks/new`)}>Create Task</Button>}
+          message={search ? 'Try adjusting your search or filters' : 'Create your first task to start tracking work'}
+          actionLabel={search ? null : 'Create Task'}
+          onAction={search ? null : () => navigate(`/projects/${id}/tasks/new`)}
         />
       ) : (
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -152,20 +153,20 @@ export default function TaskList() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <Dropdown
-                      trigger={
+                      trigger={() => (
                         <button className="p-1 hover:bg-gray-100 rounded">
                           <MoreHorizontal className="w-5 h-5 text-gray-500" />
                         </button>
-                      }
+                      )}
                     >
-                      <DropdownItem onClick={() => navigate(`/projects/${id}/tasks/${task.id}`)} icon={<Eye />}>
+                      <DropdownItem onClick={() => navigate(`/projects/${id}/tasks/${task.id}`)} icon={Eye}>
                         View Details
                       </DropdownItem>
-                      <DropdownItem onClick={() => navigate(`/projects/${id}/tasks/${task.id}/edit`)} icon={<Pencil />}>
+                      <DropdownItem onClick={() => navigate(`/projects/${id}/tasks/${task.id}/edit`)} icon={Pencil}>
                         Edit Task
                       </DropdownItem>
                       <DropdownSeparator />
-                      <DropdownItem onClick={() => {}} icon={<Trash2 />} className="text-red-600">
+                      <DropdownItem onClick={() => {}} icon={Trash2} className="text-red-600">
                         Delete
                       </DropdownItem>
                     </Dropdown>

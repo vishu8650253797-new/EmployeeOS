@@ -70,7 +70,7 @@ async function createTaskComment(organizationId, taskId, payload, authorEmployee
   const populated = await getCommentById(organizationId, item._id);
   const io = getSocketInstance();
   if (io) {
-    io.to(getProjectRoom(taskId)).emit(SOCKET_EVENTS.TASK_COMMENT_ADDED, populated);
+    io.to(getProjectRoom(task.projectId.toString())).emit(SOCKET_EVENTS.TASK_COMMENT_ADDED, populated);
   }
   return populated;
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, FolderKanban, MoreHorizontal, Eye, Pencil, Trash2, Users, Calendar, TrendingUp } from 'lucide-react';
 import { projectService } from '../../services/projectService';
@@ -61,11 +61,11 @@ export default function Projects() {
   const projects = data?.data?.data || [];
 
   const { data: empResponse } = useFetch(() => employeeService.getEmployees({ limit: 1000 }), []);
-  const employees = empResponse?.data?.data || [];
+  const employees = empResponse?.data || [];
   const ownerOptions = employees.map((e) => ({ value: e.id, label: fullName(e) }));
 
   const { data: deptResponse } = useFetch(() => departmentService.getDepartments({ limit: 1000 }), []);
-  const departments = deptResponse?.data?.data || [];
+  const departments = deptResponse || [];
   const departmentOptions = departments.map((d) => ({ value: d.id, label: d.name }));
 
   function openCreate() {
@@ -92,10 +92,10 @@ export default function Projects() {
     setModalOpen(true);
   }
 
-  function updateField(name, value) {
+  const updateField = useCallback((name, value) => {
     setForm((f) => ({ ...f, [name]: value }));
     setErrors((e) => ({ ...e, [name]: undefined }));
-  }
+  }, []);
 
   function validate() {
     const next = {};
@@ -187,23 +187,23 @@ export default function Projects() {
                   <h3 className="font-semibold text-gray-900">{project.name}</h3>
                 </div>
                 <Dropdown
-                  trigger={
+                  trigger={() => (
                     <button className="p-1 hover:bg-gray-100 rounded">
                       <MoreHorizontal className="w-5 h-5 text-gray-500" />
                     </button>
-                  }
+                  )}
                 >
-                  <DropdownItem onClick={() => navigate(`/projects/${project.id}`)} icon={<Eye />}>
+                  <DropdownItem onClick={() => navigate(`/projects/${project.id}`)} icon={Eye}>
                     View Details
                   </DropdownItem>
-                  <DropdownItem onClick={() => navigate(`/projects/${project.id}/board`)} icon={<FolderKanban />}>
+                  <DropdownItem onClick={() => navigate(`/projects/${project.id}/board`)} icon={FolderKanban}>
                     Kanban Board
                   </DropdownItem>
                   <DropdownSeparator />
-                  <DropdownItem onClick={() => openEdit(project)} icon={<Pencil />}>
+                  <DropdownItem onClick={() => openEdit(project)} icon={Pencil}>
                     Edit
                   </DropdownItem>
-                  <DropdownItem onClick={() => setDeleteTarget(project)} icon={<Trash2 />} className="text-red-600">
+                  <DropdownItem onClick={() => setDeleteTarget(project)} icon={Trash2} className="text-red-600">
                     Delete
                   </DropdownItem>
                 </Dropdown>

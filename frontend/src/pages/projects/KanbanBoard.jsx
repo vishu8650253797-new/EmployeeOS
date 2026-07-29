@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, MoreHorizontal, GripVertical, Calendar, Clock, User } from 'lucide-react';
 import { taskService } from '../../services/taskService';
+import { employeeService } from '../../services/employeeService';
 import { useFetch } from '../../hooks/useFetch';
 import { useToast } from '../../context/ToastContext';
 import { fullName } from '../../utils/format';
@@ -50,7 +51,7 @@ export default function KanbanBoard() {
   );
   const tasks = tasksResponse?.data || [];
 
-  const { data: empResponse } = useFetch(() => fetch('/api/employees?limit=1000').then(r => r.json()), []);
+  const { data: empResponse } = useFetch(() => employeeService.getEmployees({ limit: 1000 }), []);
   const employees = empResponse?.data || [];
   const assigneeOptions = employees.map((e) => ({ value: e.id, label: fullName(e) }));
 
@@ -88,10 +89,10 @@ export default function KanbanBoard() {
     setModalOpen(true);
   }
 
-  function updateField(name, value) {
+  const updateField = useCallback((name, value) => {
     setForm((f) => ({ ...f, [name]: value }));
     setErrors((e) => ({ ...e, [name]: undefined }));
-  }
+  }, []);
 
   function validate() {
     const next = {};
@@ -163,17 +164,17 @@ export default function KanbanBoard() {
                       <span className="text-xs font-mono text-gray-500">{task.taskKey}</span>
                     </div>
                     <Dropdown
-                      trigger={
+                      trigger={() => (
                         <button className="p-1 hover:bg-gray-100 rounded">
                           <MoreHorizontal className="w-4 h-4 text-gray-500" />
                         </button>
-                      }
+                      )}
                     >
-                      <DropdownItem onClick={() => navigate(`/projects/${id}/tasks/${task.id}`)} icon={<User />}>
+                      <DropdownItem onClick={() => navigate(`/projects/${id}/tasks/${task.id}`)} icon={User}>
                         View Details
                       </DropdownItem>
                       <DropdownSeparator />
-                      <DropdownItem onClick={() => navigate(`/projects/${id}/tasks/${task.id}/edit`)} icon={<Plus />}>
+                      <DropdownItem onClick={() => navigate(`/projects/${id}/tasks/${task.id}/edit`)} icon={Plus}>
                         Edit Task
                       </DropdownItem>
                     </Dropdown>

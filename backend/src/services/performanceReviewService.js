@@ -1,6 +1,27 @@
 const PerformanceReview = require('../models/PerformanceReview');
 const performanceScoreService = require('./performanceScoreService');
 const { getSocketInstance } = require('../socket/socketServer');
+const AppError = require('../utils/AppError');
+
+const ELEVATED_ROLES = ['SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'];
+const RESTRICTED_REVIEW_FIELDS = [
+  '_id', 'organizationId', 'cycleId', 'employeeId', 'reviewerId',
+  'status', 'submittedAt', 'reviewedAt', 'completedAt', 'createdAt', 'updatedAt',
+];
+
+function assertCanEditReview(actor, review) {
+  if (ELEVATED_ROLES.includes(actor.role)) return;
+  const isReviewer = actor._id && actor._id.toString() === review.reviewerId.toString();
+  const isReviewee = actor.employeeId && actor.employeeId.toString() === review.employeeId.toString();
+  if (isReviewer || isReviewee) return;
+  throw new AppError('You are not authorized to update this review', 403);
+}
+
+function sanitizeReviewData(reviewData = {}) {
+  const clean = { ...reviewData };
+  RESTRICTED_REVIEW_FIELDS.forEach((field) => delete clean[field]);
+  return clean;
+}
 
 exports.getReviews = async (organizationId, query = {}) => {
   const {
@@ -146,16 +167,18 @@ exports.createReview = async (organizationId, reviewData, userId) => {
   return review;
 };
 
-exports.updateReview = async (organizationId, reviewId, reviewData) => {
-  const review = await PerformanceReview.findOneAndUpdate(
-    { _id: reviewId, organizationId },
-    reviewData,
-    { new: true, runValidators: true }
-  );
-
-  if (!review) {
+exports.updateReview = async (organizationId, reviewId, reviewData, actor) => {
+  const existing = await PerformanceReview.findOne({ _id: reviewId, organizationId });
+  if (!existing) {
     throw new Error('Performance review not found');
   }
+  assertCanEditReview(actor, existing);
+
+  const review = await PerformanceReview.findOneAndUpdate(
+    { _id: reviewId, organizationId },
+    sanitizeReviewData(reviewData),
+    { new: true, runValidators: true }
+  );
 
   return review;
 };
@@ -233,7 +256,7 @@ exports.completeReview = async (organizationId, reviewId, reviewData) => {
     throw new Error('Performance review not found');
   }
 
-  Object.assign(review, reviewData);
+  Object.assign(review, sanitizeReviewData(reviewData));
   review.status = 'COMPLETED';
   review.completedAt = new Date();
 

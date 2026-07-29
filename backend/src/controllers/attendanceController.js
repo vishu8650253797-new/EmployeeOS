@@ -68,7 +68,8 @@ exports.getEmployeeSummary = async (req, res) => {
   const data = await attendanceService.getEmployeeSummary(
     req.organizationId,
     req.params.employeeId,
-    req.query
+    req.query,
+    req.user
   );
   res.status(200).json({ success: true, message: 'Employee summary retrieved successfully', data });
 };

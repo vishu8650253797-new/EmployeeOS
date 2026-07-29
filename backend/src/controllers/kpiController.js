@@ -1,4 +1,7 @@
 const kpiService = require('../services/kpiService');
+const AppError = require('../utils/AppError');
+
+const ELEVATED_ROLES = ['SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'];
 
 exports.getKPIs = async (req, res) => {
   const { data, pagination } = await kpiService.getKPIs(req.organizationId, req.query);
@@ -11,6 +14,10 @@ exports.getKPIById = async (req, res) => {
 };
 
 exports.getEmployeeKPIs = async (req, res) => {
+  const isSelf = req.user.employeeId && req.user.employeeId.toString() === req.params.employeeId;
+  if (!isSelf && !ELEVATED_ROLES.includes(req.user.role)) {
+    throw new AppError('You are not authorized to view this employee\'s KPIs', 403);
+  }
   const data = await kpiService.getEmployeeKPIs(req.organizationId, req.params.employeeId, req.query);
   res.json({ success: true, data });
 };

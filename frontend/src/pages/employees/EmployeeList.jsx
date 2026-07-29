@@ -184,7 +184,7 @@ export default function EmployeeList() {
           <Select
             aria-label="Filter by department"
             value={department}
-            onChange={(e) => updateFilter(setDepartment)(e.target.value)}
+            onChange={(v) => updateFilter(setDepartment)(v)}
             options={departmentOptions}
             disabled={deptLoading}
             className="sm:w-48"
@@ -192,21 +192,21 @@ export default function EmployeeList() {
           <Select
             aria-label="Filter by role"
             value={role}
-            onChange={(e) => updateFilter(setRole)(e.target.value)}
+            onChange={(v) => updateFilter(setRole)(v)}
             options={roleOptions}
             className="sm:w-44"
           />
           <Select
             aria-label="Filter by status"
             value={status}
-            onChange={(e) => updateFilter(setStatus)(e.target.value)}
+            onChange={(v) => updateFilter(setStatus)(v)}
             options={statusOptions}
             className="sm:w-40"
           />
           <Select
             aria-label="Filter by employment type"
             value={employmentType}
-            onChange={(e) => updateFilter(setEmploymentType)(e.target.value)}
+            onChange={(v) => updateFilter(setEmploymentType)(v)}
             options={employmentTypeOptions}
             className="sm:w-44"
           />

@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit, Trash2, Calendar, Clock, User, Tag, MessageSquare, History, Plus } from 'lucide-react';
 import { taskService } from '../../services/taskService';
 import { taskCommentService } from '../../services/taskCommentService';
+import { employeeService } from '../../services/employeeService';
 import { useFetch } from '../../hooks/useFetch';
 import { useToast } from '../../context/ToastContext';
 import { fullName } from '../../utils/format';
@@ -47,7 +48,7 @@ export default function TaskDetails() {
   const [selectedAssignees, setSelectedAssignees] = useState([]);
 
   const { data: task, loading, error, refetch } = useFetch(() => taskService.getTaskById(taskId), [taskId]);
-  const { data: empResponse } = useFetch(() => fetch('/api/employees?limit=1000').then(r => r.json()), []);
+  const { data: empResponse } = useFetch(() => employeeService.getEmployees({ limit: 1000 }), []);
   const employees = empResponse?.data || [];
   const assigneeOptions = employees.map((e) => ({ value: e.id, label: fullName(e) }));
 

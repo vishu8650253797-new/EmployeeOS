@@ -7,10 +7,10 @@ const create = [
   body('description').optional().trim(),
   body('status').optional().isIn(['PLANNING', 'ACTIVE', 'ON_HOLD', 'COMPLETED', 'CANCELLED']).withMessage('Invalid status'),
   body('priority').optional().isIn(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).withMessage('Invalid priority'),
-  body('startDate').optional().isISO8601().withMessage('Invalid start date'),
-  body('dueDate').optional().isISO8601().withMessage('Invalid due date'),
+  body('startDate').optional({ checkFalsy: true }).isISO8601().withMessage('Invalid start date'),
+  body('dueDate').optional({ checkFalsy: true }).isISO8601().withMessage('Invalid due date'),
   body('ownerId').isMongoId().withMessage('Invalid owner ID'),
-  body('departmentId').optional().isMongoId().withMessage('Invalid department ID'),
+  body('departmentId').optional({ checkFalsy: true }).isMongoId().withMessage('Invalid department ID'),
   validate,
 ];
 
@@ -21,10 +21,10 @@ const update = [
   body('description').optional().trim(),
   body('status').optional().isIn(['PLANNING', 'ACTIVE', 'ON_HOLD', 'COMPLETED', 'CANCELLED']).withMessage('Invalid status'),
   body('priority').optional().isIn(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).withMessage('Invalid priority'),
-  body('startDate').optional().isISO8601().withMessage('Invalid start date'),
-  body('dueDate').optional().isISO8601().withMessage('Invalid due date'),
-  body('ownerId').optional().isMongoId().withMessage('Invalid owner ID'),
-  body('departmentId').optional().isMongoId().withMessage('Invalid department ID'),
+  body('startDate').optional({ checkFalsy: true }).isISO8601().withMessage('Invalid start date'),
+  body('dueDate').optional({ checkFalsy: true }).isISO8601().withMessage('Invalid due date'),
+  body('ownerId').optional({ checkFalsy: true }).isMongoId().withMessage('Invalid owner ID'),
+  body('departmentId').optional({ checkFalsy: true }).isMongoId().withMessage('Invalid department ID'),
   validate,
 ];
 

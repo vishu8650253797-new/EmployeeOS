@@ -6,9 +6,9 @@ const kpiController = require('../controllers/kpiController');
 
 const router = Router();
 
-router.get('/', authMiddleware, asyncHandler(kpiController.getKPIs));
+router.get('/', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'), asyncHandler(kpiController.getKPIs));
 router.get('/employee/:employeeId', authMiddleware, asyncHandler(kpiController.getEmployeeKPIs));
-router.get('/cycle/:cycleId', authMiddleware, asyncHandler(kpiController.getCycleKPIs));
+router.get('/cycle/:cycleId', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'), asyncHandler(kpiController.getCycleKPIs));
 router.get('/:id', authMiddleware, asyncHandler(kpiController.getKPIById));
 router.post('/', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'), asyncHandler(kpiController.createKPI));
 router.put('/:id', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'), asyncHandler(kpiController.updateKPI));

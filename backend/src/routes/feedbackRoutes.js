@@ -6,8 +6,8 @@ const feedbackController = require('../controllers/feedbackController');
 
 const router = Router();
 
-router.get('/', authMiddleware, asyncHandler(feedbackController.getFeedback));
-router.get('/employee/:employeeId', authMiddleware, asyncHandler(feedbackController.getEmployeeFeedback));
+router.get('/', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'), asyncHandler(feedbackController.getFeedback));
+router.get('/employee/:employeeId', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'), asyncHandler(feedbackController.getEmployeeFeedback));
 router.get('/requests', authMiddleware, asyncHandler(feedbackController.getFeedbackRequests));
 router.get('/:id', authMiddleware, asyncHandler(feedbackController.getFeedbackById));
 router.post('/', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'), asyncHandler(feedbackController.createFeedback));

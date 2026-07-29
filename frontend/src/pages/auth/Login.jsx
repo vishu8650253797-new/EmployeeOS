@@ -61,7 +61,7 @@ export default function Login() {
           placeholder="you@company.com"
           required
           value={form.email}
-          onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+          onChange={(v) => setForm((f) => ({ ...f, email: v }))}
           error={errors.email}
         />
 
@@ -75,7 +75,7 @@ export default function Login() {
               placeholder="••••••••"
               required
               value={form.password}
-              onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+              onChange={(v) => setForm((f) => ({ ...f, password: v }))}
               error={errors.password}
             />
             <button

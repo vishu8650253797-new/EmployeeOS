@@ -1,6 +1,16 @@
 const Feedback = require('../models/Feedback');
 const FeedbackRequest = require('../models/FeedbackRequest');
 const { getSocketInstance } = require('../socket/socketServer');
+const AppError = require('../utils/AppError');
+
+const ELEVATED_ROLES = ['SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'];
+const RESTRICTED_FEEDBACK_FIELDS = ['_id', 'organizationId', 'employeeId', 'authorId', 'createdAt', 'updatedAt'];
+
+function sanitizeFeedbackData(feedbackData = {}) {
+  const clean = { ...feedbackData };
+  RESTRICTED_FEEDBACK_FIELDS.forEach((field) => delete clean[field]);
+  return clean;
+}
 
 exports.getFeedback = async (organizationId, query = {}) => {
   const {
@@ -107,16 +117,22 @@ exports.createFeedback = async (organizationId, feedbackData, userId) => {
   return feedback;
 };
 
-exports.updateFeedback = async (organizationId, feedbackId, feedbackData) => {
-  const feedback = await Feedback.findOneAndUpdate(
-    { _id: feedbackId, organizationId },
-    feedbackData,
-    { new: true, runValidators: true }
-  );
-
-  if (!feedback) {
+exports.updateFeedback = async (organizationId, feedbackId, feedbackData, actor) => {
+  const existing = await Feedback.findOne({ _id: feedbackId, organizationId });
+  if (!existing) {
     throw new Error('Feedback not found');
   }
+
+  const isAuthor = actor._id && actor._id.toString() === existing.authorId.toString();
+  if (!isAuthor && !ELEVATED_ROLES.includes(actor.role)) {
+    throw new AppError('You are not authorized to update this feedback', 403);
+  }
+
+  const feedback = await Feedback.findOneAndUpdate(
+    { _id: feedbackId, organizationId },
+    sanitizeFeedbackData(feedbackData),
+    { new: true, runValidators: true }
+  );
 
   return feedback;
 };

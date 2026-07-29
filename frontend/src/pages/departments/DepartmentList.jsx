@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Building2, MoreHorizontal, Eye, Pencil, Trash2 } from 'lucide-react';
 import { departmentService } from '../../services/departmentService';
@@ -68,10 +68,10 @@ export default function DepartmentList() {
     setModalOpen(true);
   }
 
-  function updateField(name, value) {
+  const updateField = useCallback((name, value) => {
     setForm((f) => ({ ...f, [name]: value }));
     setErrors((e) => ({ ...e, [name]: undefined }));
-  }
+  }, []);
 
   function validate() {
     const next = {};
@@ -238,7 +238,7 @@ export default function DepartmentList() {
             label="Department name"
             required
             value={form.name}
-            onChange={(e) => updateField('name', e.target.value)}
+            onChange={(v) => updateField('name', v)}
             error={errors.name}
             placeholder="e.g. Customer Success"
           />
@@ -246,28 +246,29 @@ export default function DepartmentList() {
             label="Short code"
             required
             value={form.code}
-            onChange={(e) => updateField('code', e.target.value.toUpperCase())}
+            onChange={(v) => updateField('code', v)}
             error={errors.code}
             placeholder="e.g. CS"
             maxLength={10}
+            uppercase
           />
           <Select
             label="Department head"
             value={form.headId}
-            onChange={(e) => updateField('headId', e.target.value)}
+            onChange={(v) => updateField('headId', v)}
             placeholder="Select a lead"
             options={[{ value: '', label: 'Select a lead' }, ...managerOptions]}
           />
           <Select
             label="Status"
             value={form.status}
-            onChange={(e) => updateField('status', e.target.value)}
+            onChange={(v) => updateField('status', v)}
             options={DEPARTMENT_STATUSES}
           />
           <Input
             label="Description"
             value={form.description}
-            onChange={(e) => updateField('description', e.target.value)}
+            onChange={(v) => updateField('description', v)}
             placeholder="What does this team own?"
           />
         </form>

@@ -7,6 +7,7 @@ import { StatusBadge } from '../../components/ui/Badge';
 import { TrendingUp, Target, Award, AlertTriangle, Users, BarChart3 } from 'lucide-react';
 import { performanceAnalyticsService } from '../../services/performanceAnalyticsService';
 import { performanceReviewService } from '../../services/performanceReviewService';
+import { performanceCycleService } from '../../services/performanceCycleService';
 import { goalService } from '../../services/goalService';
 import { kpiService } from '../../services/kpiService';
 
@@ -33,12 +34,12 @@ export default function Performance() {
       setLoading(true);
       
       const [cycleData, analyticsData] = await Promise.all([
-        performanceAnalyticsService.getOverviewAnalytics(),
+        performanceCycleService.getActiveCycle(),
         performanceAnalyticsService.getOverviewAnalytics()
       ]);
 
-      setActiveCycle(cycleData.data);
-      setAnalytics(analyticsData.data);
+      setActiveCycle(cycleData.data.data);
+      setAnalytics(analyticsData.data.data);
 
       if (user?.employeeId) {
         const [goalsData, kpisData, reviewsData] = await Promise.all([
@@ -47,9 +48,9 @@ export default function Performance() {
           performanceReviewService.getMyReviews()
         ]);
 
-        setMyGoals(goalsData.data || []);
-        setMyKPIs(kpisData.data || []);
-        setMyReviews(reviewsData.data || []);
+        setMyGoals(goalsData.data.data || []);
+        setMyKPIs(kpisData.data.data || []);
+        setMyReviews(reviewsData.data.data || []);
       }
     } catch (error) {
       toast.error('Failed to load performance data');

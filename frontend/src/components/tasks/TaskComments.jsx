@@ -104,9 +104,9 @@ export default function TaskComments({ taskId }) {
         <CardSkeleton count={2} />
       ) : comments.length === 0 ? (
         <EmptyState
-          icon={<MessageSquare className="w-8 h-8" />}
+          icon={MessageSquare}
           title="No comments yet"
-          description="Be the first to comment on this task"
+          message="Be the first to comment on this task"
         />
       ) : (
         <div className="space-y-4">
@@ -139,17 +139,17 @@ export default function TaskComments({ taskId }) {
                   <>
                     <p className="text-sm text-gray-700 mb-2">{comment.content}</p>
                     <Dropdown
-                      trigger={
+                      trigger={() => (
                         <button className="p-1 hover:bg-gray-100 rounded">
                           <MoreHorizontal className="w-4 h-4 text-gray-400" />
                         </button>
-                      }
+                      )}
                     >
-                      <DropdownItem onClick={() => openEdit(comment)} icon={<Edit />}>
+                      <DropdownItem onClick={() => openEdit(comment)} icon={Edit}>
                         Edit
                       </DropdownItem>
                       <DropdownSeparator />
-                      <DropdownItem onClick={() => setDeleteTarget(comment)} icon={<Trash2 />} className="text-red-600">
+                      <DropdownItem onClick={() => setDeleteTarget(comment)} icon={Trash2} className="text-red-600">
                         Delete
                       </DropdownItem>
                     </Dropdown>

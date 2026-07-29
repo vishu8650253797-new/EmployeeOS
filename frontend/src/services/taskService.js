@@ -8,4 +8,5 @@ export const taskService = {
   deleteTask: (id) => api.delete(`/tasks/${id}`).then((r) => r.data),
   updateTaskStatus: (id, status) => api.patch(`/tasks/${id}/status`, { status }).then((r) => r.data),
   assignTask: (id, assigneeIds) => api.patch(`/tasks/${id}/assign`, { assigneeIds }).then((r) => r.data),
+  getTaskActivities: (id, params = {}) => api.get(`/tasks/${id}/activities`, { params }).then((r) => r.data),
 };
