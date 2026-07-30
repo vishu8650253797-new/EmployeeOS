@@ -19,8 +19,8 @@ export default function Feedback() {
   const loadFeedback = async () => {
     try {
       setLoading(true);
-      const response = await feedbackService.getFeedback();
-      setFeedback(response.data.data || []);
+      const feedback = await feedbackService.getFeedback();
+      setFeedback(feedback);
     } catch (error) {
       toast.error('Failed to load feedback');
     } finally {

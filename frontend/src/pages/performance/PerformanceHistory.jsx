@@ -21,8 +21,8 @@ export default function PerformanceHistory() {
     
     try {
       setLoading(true);
-      const response = await performanceAnalyticsService.getPerformanceTrends(user.employeeId);
-      setTrends(response.data.data || []);
+      const trends = await performanceAnalyticsService.getPerformanceTrends(user.employeeId);
+      setTrends(trends);
     } catch (error) {
       toast.error('Failed to load performance history');
     } finally {

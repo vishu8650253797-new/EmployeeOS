@@ -1,12 +1,30 @@
 import api from './api';
 
 const performanceAnalyticsService = {
-  getOverviewAnalytics: (cycleId) => api.get('/performance-analytics/overview', { params: { cycleId } }),
-  getDepartmentAnalytics: (cycleId) => api.get('/performance-analytics/departments', { params: { cycleId } }),
-  getPerformanceTrends: (employeeId) => api.get(`/performance-analytics/trends/${employeeId}`),
-  getTopPerformers: (cycleId, limit) => api.get('/performance-analytics/top-performers', { params: { cycleId, limit } }),
-  getAtRiskEmployees: (cycleId) => api.get('/performance-analytics/at-risk', { params: { cycleId } }),
-  getEmployeePerformanceSummary: (employeeId, cycleId) => api.get(`/performance-analytics/employee/${employeeId}/summary`, { params: { cycleId } }),
+  getOverviewAnalytics: async (cycleId) => {
+    const response = await api.get('/performance-analytics/overview', { params: { cycleId } });
+    return response.data.data;
+  },
+  getDepartmentAnalytics: async (cycleId) => {
+    const response = await api.get('/performance-analytics/departments', { params: { cycleId } });
+    return response.data.data || [];
+  },
+  getPerformanceTrends: async (employeeId) => {
+    const response = await api.get(`/performance-analytics/trends/${employeeId}`);
+    return response.data.data || [];
+  },
+  getTopPerformers: async (cycleId, limit) => {
+    const response = await api.get('/performance-analytics/top-performers', { params: { cycleId, limit } });
+    return response.data.data || [];
+  },
+  getAtRiskEmployees: async (cycleId) => {
+    const response = await api.get('/performance-analytics/at-risk', { params: { cycleId } });
+    return response.data.data || [];
+  },
+  getEmployeePerformanceSummary: async (employeeId, cycleId) => {
+    const response = await api.get(`/performance-analytics/employee/${employeeId}/summary`, { params: { cycleId } });
+    return response.data.data;
+  },
 };
 
 export { performanceAnalyticsService };
