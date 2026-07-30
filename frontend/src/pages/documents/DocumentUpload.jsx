@@ -30,10 +30,8 @@ export default function DocumentUpload() {
   const loadCategories = async () => {
     try {
       const categories = await documentCategoryService.getCategories();
-      console.log('Categories loaded:', categories);
       setCategories(categories);
     } catch (error) {
-      console.error('Failed to load categories:', error);
       toast.error('Failed to load categories');
     }
   };
@@ -41,10 +39,8 @@ export default function DocumentUpload() {
   const loadEmployees = async () => {
     try {
       const response = await employeeService.getEmployees();
-      console.log('Employees loaded:', response);
       setEmployees(response.data || []);
     } catch (error) {
-      console.error('Failed to load employees:', error);
       toast.error('Failed to load employees');
     }
   };
@@ -61,9 +57,6 @@ export default function DocumentUpload() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Form submitted');
-    console.log('File:', file);
-    console.log('FormData:', formData);
     
     if (!file) {
       toast.error('Please select a file');
@@ -92,18 +85,12 @@ export default function DocumentUpload() {
     formDataToSend.append('title', formData.title);
     formDataToSend.append('description', formData.description);
 
-    console.log('FormDataToSend entries:', Array.from(formDataToSend.entries()));
-
     try {
       setLoading(true);
-      console.log('Calling uploadDocument...');
       await documentService.uploadDocument(formDataToSend);
-      console.log('Upload successful');
       toast.success('Document uploaded successfully');
       navigate('/documents');
     } catch (error) {
-      console.error('Upload error:', error);
-      console.error('Error response:', error.response);
       toast.error(error.response?.data?.message || error.message || 'Failed to upload document');
     } finally {
       setLoading(false);

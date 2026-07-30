@@ -24,7 +24,6 @@ export default function Documents() {
       const documents = await documentService.getDocuments();
       setDocuments(documents);
     } catch (error) {
-      console.error('Failed to load documents:', error);
       toast.error('Failed to load documents');
     } finally {
       setLoading(false);
