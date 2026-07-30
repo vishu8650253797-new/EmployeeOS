@@ -41,6 +41,12 @@ const PerformanceHistory = lazy(() => import('./pages/performance/PerformanceHis
 const PerformanceAnalytics = lazy(() => import('./pages/performance/PerformanceAnalytics'));
 const Documents = lazy(() => import('./pages/documents/Documents'));
 const DocumentUpload = lazy(() => import('./pages/documents/DocumentUpload'));
+const DocumentRequests = lazy(() => import('./pages/documents/DocumentRequests'));
+const DocumentVersions = lazy(() => import('./pages/documents/DocumentVersions'));
+const DocumentVerification = lazy(() => import('./pages/documents/DocumentVerification'));
+const EmployeeDocumentDashboard = lazy(() => import('./pages/documents/EmployeeDocumentDashboard'));
+const HRDocumentDashboard = lazy(() => import('./pages/documents/HRDocumentDashboard'));
+const DocumentAnalytics = lazy(() => import('./pages/documents/DocumentAnalytics'));
 const ComingSoon = lazy(() => import('./pages/misc/ComingSoon'));
 const NotFound = lazy(() => import('./pages/misc/NotFound'));
 
@@ -98,6 +104,15 @@ export default function App() {
 
                   <Route path="/documents" element={<Documents />} />
                   <Route path="/documents/upload" element={<DocumentUpload />} />
+                  <Route path="/documents/requests" element={<DocumentRequests />} />
+                  <Route path="/documents/requests/:id" element={<DocumentRequests />} />
+                  <Route path="/documents/requests/:id/upload" element={<DocumentUpload />} />
+                  <Route path="/documents/:id" element={<Documents />} />
+                  <Route path="/documents/:id/versions" element={<DocumentVersions />} />
+                  <Route path="/documents/:id/verify" element={<DocumentVerification />} />
+                  <Route path="/my-documents" element={<EmployeeDocumentDashboard />} />
+                  <Route path="/hr/documents" element={<HRDocumentDashboard />} />
+                  <Route path="/documents/analytics" element={<DocumentAnalytics />} />
 
                   <Route path="/tasks" element={<ComingSoon title="Tasks" />} />
                   <Route path="/payroll" element={<ComingSoon title="Payroll" />} />
