@@ -19,6 +19,10 @@ const kpiRoutes = require('./kpiRoutes');
 const performanceReviewRoutes = require('./performanceReviewRoutes');
 const feedbackRoutes = require('./feedbackRoutes');
 const performanceAnalyticsRoutes = require('./performanceAnalyticsRoutes');
+const documentRoutes = require('./documentRoutes');
+const documentCategoryRoutes = require('./documentCategoryRoutes');
+const documentRequestRoutes = require('./documentRequestRoutes');
+const documentAnalyticsRoutes = require('./documentAnalyticsRoutes');
 
 const router = Router();
 
@@ -46,5 +50,9 @@ router.use('/kpis', kpiRoutes);
 router.use('/performance-reviews', performanceReviewRoutes);
 router.use('/feedback', feedbackRoutes);
 router.use('/performance-analytics', performanceAnalyticsRoutes);
+router.use('/documents', documentRoutes);
+router.use('/document-categories', documentCategoryRoutes);
+router.use('/document-requests', documentRequestRoutes);
+router.use('/document-analytics', documentAnalyticsRoutes);
 
 module.exports = router;

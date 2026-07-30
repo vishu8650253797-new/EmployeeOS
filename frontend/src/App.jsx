@@ -39,6 +39,8 @@ const PerformanceReviews = lazy(() => import('./pages/performance/PerformanceRev
 const Feedback = lazy(() => import('./pages/performance/Feedback'));
 const PerformanceHistory = lazy(() => import('./pages/performance/PerformanceHistory'));
 const PerformanceAnalytics = lazy(() => import('./pages/performance/PerformanceAnalytics'));
+const Documents = lazy(() => import('./pages/documents/Documents'));
+const DocumentUpload = lazy(() => import('./pages/documents/DocumentUpload'));
 const ComingSoon = lazy(() => import('./pages/misc/ComingSoon'));
 const NotFound = lazy(() => import('./pages/misc/NotFound'));
 
@@ -94,8 +96,10 @@ export default function App() {
                   <Route path="/performance/history" element={<PerformanceHistory />} />
                   <Route path="/performance/analytics" element={<PerformanceAnalytics />} />
 
+                  <Route path="/documents" element={<Documents />} />
+                  <Route path="/documents/upload" element={<DocumentUpload />} />
+
                   <Route path="/tasks" element={<ComingSoon title="Tasks" />} />
-                  <Route path="/documents" element={<ComingSoon title="Documents" />} />
                   <Route path="/payroll" element={<ComingSoon title="Payroll" />} />
                   <Route path="/reports" element={<ComingSoon title="Reports" />} />
                   <Route path="/settings" element={<ComingSoon title="Settings" />} />

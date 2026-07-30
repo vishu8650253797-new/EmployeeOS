@@ -15,4 +15,9 @@ module.exports = {
   Task: require('./Task'),
   TaskComment: require('./TaskComment'),
   TaskActivity: require('./TaskActivity'),
+  EmployeeDocument: require('./EmployeeDocument'),
+  DocumentCategory: require('./DocumentCategory'),
+  DocumentVersion: require('./DocumentVersion'),
+  DocumentRequest: require('./DocumentRequest'),
+  AuditLog: require('./AuditLog'),
 };

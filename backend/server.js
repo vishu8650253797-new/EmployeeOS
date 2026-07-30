@@ -3,6 +3,7 @@ const app = require('./src/app');
 const { connectDB } = require('./src/config/db');
 const seedAdmin = require('./src/utils/seedAdmin');
 const { initSocketServer } = require('./src/socket/socketServer');
+const { startDocumentExpiryJob } = require('./src/jobs/documentExpiryJob');
 
 const PORT = process.env.PORT || 5000;
 
@@ -18,6 +19,7 @@ async function start() {
     });
 
     initSocketServer(server);
+    startDocumentExpiryJob();
 
     server.on('error', (error) => {
       if (error.code === 'EADDRINUSE') {

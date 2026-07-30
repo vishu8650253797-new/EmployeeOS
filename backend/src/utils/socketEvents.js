@@ -48,6 +48,18 @@ const SOCKET_EVENTS = {
   FEEDBACK_SUBMITTED: 'feedback:submitted',
   FEEDBACK_REQUESTED: 'feedback:requested',
   PERFORMANCE_SCORE_UPDATED: 'performance:score-updated',
+  DOCUMENT_UPLOADED: 'document:uploaded',
+  DOCUMENT_UPDATED: 'document:updated',
+  DOCUMENT_REPLACED: 'document:replaced',
+  DOCUMENT_VERIFIED: 'document:verified',
+  DOCUMENT_REJECTED: 'document:rejected',
+  DOCUMENT_DELETED: 'document:deleted',
+  DOCUMENT_EXPIRING: 'document:expiring',
+  DOCUMENT_EXPIRED: 'document:expired',
+  DOCUMENT_REQUEST_CREATED: 'document-request:created',
+  DOCUMENT_REQUEST_UPLOADED: 'document-request:uploaded',
+  DOCUMENT_REQUEST_APPROVED: 'document-request:approved',
+  DOCUMENT_REQUEST_REJECTED: 'document-request:rejected',
 };
 
 module.exports = SOCKET_EVENTS;
