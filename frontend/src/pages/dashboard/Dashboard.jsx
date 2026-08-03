@@ -224,15 +224,15 @@ function Donut3DChart({ title, subtitle, segments, total }) {
       <CardHeader title={title} subtitle={subtitle} />
       <div className="mt-4 border-t border-line pt-6">
         <div
-          className="mx-auto relative h-72 w-72 rounded-full"
+          className="mx-auto relative h-40 w-40 rounded-full sm:h-48 sm:w-48 lg:h-56 lg:w-56"
           style={{ backgroundImage: `conic-gradient(from -90deg, ${stops.join(', ')})` }}
           role="img"
           aria-label={`${title} circular chart`}
         >
-          <div className="absolute inset-[36px] rounded-full bg-surface" aria-hidden="true" />
+          <div className="absolute inset-[20px] rounded-full bg-surface sm:inset-[24px] lg:inset-[28px]" aria-hidden="true" />
         </div>
 
-        <ul className="mx-auto mt-8 grid max-w-xl grid-cols-1 gap-x-8 gap-y-3 text-center sm:grid-cols-2">
+        <ul className="mx-auto mt-6 grid max-w-xl grid-cols-1 gap-x-8 gap-y-2 text-center sm:grid-cols-2">
           {segments.map((segment) => {
             return (
               <li key={segment.label || segment.name} className="flex items-center justify-center gap-3 text-[13px]">
