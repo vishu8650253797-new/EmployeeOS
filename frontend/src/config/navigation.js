@@ -20,6 +20,11 @@ import {
   MessageSquare,
   History,
   BarChart2,
+  Briefcase,
+  UserCheck,
+  Kanban,
+  Calendar,
+  Send,
 } from 'lucide-react';
 
 // Sidebar navigation. Later, filter sections/items by role permissions.
@@ -58,6 +63,18 @@ export const NAV_SECTIONS = [
       { label: 'Documents', to: '/documents', icon: FolderOpen },
       { label: 'Payroll', to: '/payroll', icon: Wallet },
       { label: 'Reports', to: '/reports', icon: BarChart3 },
+    ],
+  },
+  {
+    title: 'Recruitment',
+    items: [
+      { label: 'Recruitment', to: '/recruitment', icon: Briefcase },
+      { label: 'Jobs', to: '/recruitment/jobs', icon: Briefcase },
+      { label: 'Candidates', to: '/recruitment/candidates', icon: UserCheck },
+      { label: 'Pipeline', to: '/recruitment/pipeline', icon: Kanban },
+      { label: 'Interviews', to: '/recruitment/interviews', icon: Calendar },
+      { label: 'Offers', to: '/recruitment/offers', icon: Send },
+      { label: 'Analytics', to: '/recruitment/analytics', icon: BarChart2 },
     ],
   },
 ];

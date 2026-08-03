@@ -47,6 +47,30 @@ const DocumentVerification = lazy(() => import('./pages/documents/DocumentVerifi
 const EmployeeDocumentDashboard = lazy(() => import('./pages/documents/EmployeeDocumentDashboard'));
 const HRDocumentDashboard = lazy(() => import('./pages/documents/HRDocumentDashboard'));
 const DocumentAnalytics = lazy(() => import('./pages/documents/DocumentAnalytics'));
+
+// Recruitment pages
+const RecruitmentDashboard = lazy(() => import('./pages/recruitment/RecruitmentDashboard'));
+const JobList = lazy(() => import('./pages/recruitment/JobList'));
+const JobForm = lazy(() => import('./pages/recruitment/JobForm'));
+const CandidateList = lazy(() => import('./pages/recruitment/CandidateList'));
+const CandidateDetail = lazy(() => import('./pages/recruitment/CandidateDetail'));
+const CandidateForm = lazy(() => import('./pages/recruitment/CandidateForm'));
+const CandidatePipeline = lazy(() => import('./pages/recruitment/CandidatePipeline'));
+const InterviewList = lazy(() => import('./pages/recruitment/InterviewList'));
+const InterviewDetail = lazy(() => import('./pages/recruitment/InterviewDetail'));
+const InterviewForm = lazy(() => import('./pages/recruitment/InterviewForm'));
+const OfferList = lazy(() => import('./pages/recruitment/OfferList'));
+const OfferDetail = lazy(() => import('./pages/recruitment/OfferDetail'));
+const OfferForm = lazy(() => import('./pages/recruitment/OfferForm'));
+const RecruitmentAnalytics = lazy(() => import('./pages/recruitment/RecruitmentAnalytics'));
+
+// Public careers pages
+const CareersPage = lazy(() => import('./pages/careers/CareersPage'));
+const JobDetailsPage = lazy(() => import('./pages/careers/JobDetailsPage'));
+const ApplicationFormPage = lazy(() => import('./pages/careers/ApplicationFormPage'));
+const ApplicationSuccessPage = lazy(() => import('./pages/careers/ApplicationSuccessPage'));
+const OfferResponsePage = lazy(() => import('./pages/careers/OfferResponsePage'));
+
 const ComingSoon = lazy(() => import('./pages/misc/ComingSoon'));
 const NotFound = lazy(() => import('./pages/misc/NotFound'));
 
@@ -64,6 +88,13 @@ export default function App() {
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
               </Route>
+
+              {/* Public careers routes */}
+              <Route path="/careers" element={<CareersPage />} />
+              <Route path="/careers/jobs/:slug" element={<JobDetailsPage />} />
+              <Route path="/careers/jobs/:slug/apply" element={<ApplicationFormPage />} />
+              <Route path="/careers/success" element={<ApplicationSuccessPage />} />
+              <Route path="/careers/offer/:token" element={<OfferResponsePage />} />
 
               {/* Protected app routes */}
               <Route element={<ProtectedRoute />}>
@@ -113,6 +144,26 @@ export default function App() {
                   <Route path="/my-documents" element={<EmployeeDocumentDashboard />} />
                   <Route path="/hr/documents" element={<HRDocumentDashboard />} />
                   <Route path="/documents/analytics" element={<DocumentAnalytics />} />
+
+                  <Route path="/recruitment" element={<RecruitmentDashboard />} />
+                  <Route path="/recruitment/jobs" element={<JobList />} />
+                  <Route path="/recruitment/jobs/new" element={<JobForm />} />
+                  <Route path="/recruitment/jobs/:id" element={<JobForm />} />
+                  <Route path="/recruitment/jobs/:id/edit" element={<JobForm />} />
+                  <Route path="/recruitment/candidates" element={<CandidateList />} />
+                  <Route path="/recruitment/candidates/new" element={<CandidateForm />} />
+                  <Route path="/recruitment/candidates/:id" element={<CandidateDetail />} />
+                  <Route path="/recruitment/candidates/:id/edit" element={<CandidateForm />} />
+                  <Route path="/recruitment/pipeline" element={<CandidatePipeline />} />
+                  <Route path="/recruitment/interviews" element={<InterviewList />} />
+                  <Route path="/recruitment/interviews/new" element={<InterviewForm />} />
+                  <Route path="/recruitment/interviews/:id" element={<InterviewDetail />} />
+                  <Route path="/recruitment/interviews/:id/edit" element={<InterviewForm />} />
+                  <Route path="/recruitment/offers" element={<OfferList />} />
+                  <Route path="/recruitment/offers/new" element={<OfferForm />} />
+                  <Route path="/recruitment/offers/:id" element={<OfferDetail />} />
+                  <Route path="/recruitment/offers/:id/edit" element={<OfferForm />} />
+                  <Route path="/recruitment/analytics" element={<RecruitmentAnalytics />} />
 
                   <Route path="/tasks" element={<ComingSoon title="Tasks" />} />
                   <Route path="/payroll" element={<ComingSoon title="Payroll" />} />

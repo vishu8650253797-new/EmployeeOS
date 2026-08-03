@@ -1,7 +1,7 @@
 const { Schema, model } = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-const ROLES = ['SUPER_ADMIN', 'HR_ADMIN', 'MANAGER', 'EMPLOYEE', 'FINANCE', 'IT_ADMIN'];
+const ROLES = ['SUPER_ADMIN', 'HR_ADMIN', 'MANAGER', 'EMPLOYEE', 'FINANCE', 'IT_ADMIN', 'RECRUITER', 'HIRING_MANAGER', 'INTERVIEWER'];
 const STATUSES = ['active', 'inactive', 'suspended'];
 
 const userSchema = new Schema(

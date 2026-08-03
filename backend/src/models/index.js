@@ -20,4 +20,12 @@ module.exports = {
   DocumentVersion: require('./DocumentVersion'),
   DocumentRequest: require('./DocumentRequest'),
   AuditLog: require('./AuditLog'),
+  JobOpening: require('./JobOpening'),
+  Candidate: require('./Candidate'),
+  JobApplication: require('./JobApplication'),
+  Interview: require('./Interview'),
+  InterviewFeedback: require('./InterviewFeedback'),
+  JobOffer: require('./JobOffer'),
+  CandidateNote: require('./CandidateNote'),
+  CandidateActivity: require('./CandidateActivity'),
 };

@@ -23,6 +23,8 @@ const documentRoutes = require('./documentRoutes');
 const documentCategoryRoutes = require('./documentCategoryRoutes');
 const documentRequestRoutes = require('./documentRequestRoutes');
 const documentAnalyticsRoutes = require('./documentAnalyticsRoutes');
+const recruitmentRoutes = require('./recruitmentRoutes');
+const publicJobRoutes = require('./publicJobRoutes');
 
 const router = Router();
 
@@ -54,5 +56,7 @@ router.use('/documents', documentRoutes);
 router.use('/document-categories', documentCategoryRoutes);
 router.use('/document-requests', documentRequestRoutes);
 router.use('/document-analytics', documentAnalyticsRoutes);
+router.use('/recruitment', recruitmentRoutes);
+router.use('/public', publicJobRoutes);
 
 module.exports = router;
