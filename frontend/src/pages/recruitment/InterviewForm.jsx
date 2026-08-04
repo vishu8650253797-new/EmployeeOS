@@ -4,6 +4,7 @@ import { useToast } from '../../context/ToastContext';
 import { interviewService } from '../../services/interviewService';
 import { candidateService } from '../../services/candidateService';
 import { recruitmentJobService } from '../../services/recruitmentJobService';
+import { applicationService } from '../../services/applicationService';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import PageHeader from '../../components/layout/PageHeader';
 import Button from '../../components/ui/Button';
@@ -11,7 +12,26 @@ import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import { LoadingState, ErrorState } from '../../components/ui/States';
 
-const INTERVIEW_TYPES = ['PHONE', 'VIDEO', 'ONSITE', 'TECHNICAL', 'PANEL', 'GROUP'];
+const INTERVIEW_TYPES = [
+  { value: 'PHONE_SCREEN', label: 'Phone Screen' },
+  { value: 'HR_INTERVIEW', label: 'HR Interview' },
+  { value: 'TECHNICAL', label: 'Technical' },
+  { value: 'BEHAVIORAL', label: 'Behavioral' },
+  { value: 'MANAGERIAL', label: 'Managerial' },
+  { value: 'FINAL', label: 'Final' },
+  { value: 'OTHER', label: 'Other' },
+];
+
+function extractId(ref) {
+  if (!ref) return '';
+  return (ref._id || ref.id || '').toString();
+}
+
+function toLocalInputValue(date) {
+  if (!date) return '';
+  const d = new Date(date);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
 
 export default function InterviewForm() {
   const { user } = useAuth();
@@ -28,7 +48,7 @@ export default function InterviewForm() {
   const [formData, setFormData] = useState({
     candidateId: searchParams.get('candidateId') || '',
     jobId: '',
-    type: 'VIDEO',
+    interviewType: 'TECHNICAL',
     scheduledDate: '',
     duration: 60,
     location: '',
@@ -52,17 +72,18 @@ export default function InterviewForm() {
       setJobs(jobsRes.data || []);
 
       if (isEdit) {
-        const interviewRes = await interviewService.getInterview(id);
-        const interview = interviewRes;
+        const interview = await interviewService.getInterview(id);
+        const start = interview.scheduledStart ? new Date(interview.scheduledStart) : null;
+        const end = interview.scheduledEnd ? new Date(interview.scheduledEnd) : null;
         setFormData({
-          candidateId: interview.candidateId?.id || '',
-          jobId: interview.jobId?.id || '',
-          type: interview.type || 'VIDEO',
-          scheduledDate: interview.scheduledDate ? interview.scheduledDate.slice(0, 16) : '',
-          duration: interview.duration || 60,
+          candidateId: extractId(interview.candidateId),
+          jobId: extractId(interview.jobId),
+          interviewType: interview.interviewType || 'TECHNICAL',
+          scheduledDate: toLocalInputValue(start),
+          duration: start && end ? Math.round((end - start) / 60000) : 60,
           location: interview.location || '',
-          description: interview.description || '',
-          interviewerIds: interview.interviewers?.map((i) => i.id) || [],
+          description: interview.notes || '',
+          interviewerIds: (interview.interviewerIds || []).map(extractId),
         });
       }
     } catch (err) {
@@ -74,20 +95,43 @@ export default function InterviewForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.candidateId || !formData.jobId) {
+      toast.error('Please select a candidate and a job');
+      return;
+    }
+
     try {
       setSubmitting(true);
-      const payload = {
-        ...formData,
-        scheduledDate: new Date(formData.scheduledDate).toISOString(),
-        duration: Number(formData.duration),
-        interviewerIds: formData.interviewerIds.filter(Boolean),
-      };
+      const start = new Date(formData.scheduledDate);
+      const end = new Date(start.getTime() + Number(formData.duration) * 60000);
 
       if (isEdit) {
-        await interviewService.rescheduleInterview(id, payload);
+        await interviewService.rescheduleInterview(id, {
+          scheduledStart: start.toISOString(),
+          scheduledEnd: end.toISOString(),
+        });
         toast.success('Interview rescheduled successfully');
       } else {
-        await interviewService.createInterview(payload);
+        const applicationsRes = await applicationService.getApplications({
+          candidate: formData.candidateId,
+          job: formData.jobId,
+        });
+        const application = (applicationsRes.data || [])[0];
+        if (!application) {
+          toast.error('This candidate has not applied to this job — interviews can only be scheduled for an existing application.');
+          setSubmitting(false);
+          return;
+        }
+
+        await interviewService.createInterview({
+          applicationId: application.id,
+          interviewType: formData.interviewType,
+          scheduledStart: start.toISOString(),
+          scheduledEnd: end.toISOString(),
+          location: formData.location,
+          notes: formData.description,
+          interviewerIds: formData.interviewerIds.filter(Boolean),
+        });
         toast.success('Interview scheduled successfully');
       }
       navigate('/recruitment/interviews');
@@ -116,23 +160,32 @@ export default function InterviewForm() {
       <form onSubmit={handleSubmit} className="max-w-3xl space-y-6">
         <div className="rounded-xl border border-line bg-surface p-5">
           <h3 className="mb-4 text-sm font-semibold text-ink-900">Interview Details</h3>
+          {isEdit && (
+            <p className="mb-4 text-xs text-ink-500">Candidate and job are locked — they can't be changed after the interview is scheduled.</p>
+          )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Select
               label="Candidate"
+              required
+              disabled={isEdit}
+              placeholder="Select a candidate"
               value={formData.candidateId}
               onChange={(v) => setFormData({ ...formData, candidateId: v })}
               options={candidates.map((c) => ({ value: c.id, label: `${c.firstName} ${c.lastName} - ${c.email}` }))}
             />
             <Select
               label="Job"
+              required
+              disabled={isEdit}
+              placeholder="Select a job"
               value={formData.jobId}
               onChange={(v) => setFormData({ ...formData, jobId: v })}
               options={jobs.map((j) => ({ value: j.id, label: j.title }))}
             />
             <Select
               label="Interview Type"
-              value={formData.type}
-              onChange={(v) => setFormData({ ...formData, type: v })}
+              value={formData.interviewType}
+              onChange={(v) => setFormData({ ...formData, interviewType: v })}
               options={INTERVIEW_TYPES}
             />
             <Input

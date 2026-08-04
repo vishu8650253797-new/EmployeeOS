@@ -1,5 +1,6 @@
 const { Employee } = require('../models');
 const leaveRequestService = require('../services/leaveRequestService');
+const AppError = require('../utils/AppError');
 
 async function resolveEmployeeId(req) {
   if (req.user.employeeId) return req.user.employeeId;
@@ -14,7 +15,7 @@ exports.getLeaveRequests = async (req, res) => {
 
 exports.getMyLeaveRequests = async (req, res) => {
   const employeeId = await resolveEmployeeId(req);
-  if (!employeeId) throw new Error('Employee profile not linked');
+  if (!employeeId) throw new AppError('Employee profile not linked', 400);
   const { data } = await leaveRequestService.getMyLeaveRequests(req.organizationId, employeeId, req.query);
   res.json({ success: true, data });
 };
