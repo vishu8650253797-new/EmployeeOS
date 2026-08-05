@@ -28,4 +28,7 @@ module.exports = {
   JobOffer: require('./JobOffer'),
   CandidateNote: require('./CandidateNote'),
   CandidateActivity: require('./CandidateActivity'),
+  OnboardingTemplate: require('./OnboardingTemplate'),
+  OnboardingProcess: require('./OnboardingProcess'),
+  OnboardingTask: require('./OnboardingTask'),
 };
