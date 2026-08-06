@@ -1,6 +1,11 @@
 const { Types } = require('mongoose');
 const { OnboardingTemplate } = require('../models');
 const AppError = require('../utils/AppError');
+const auditLogService = require('./auditLogService');
+
+function recordAudit(organizationId, userId, action, entityId, metadata = {}, reqMeta = {}) {
+  return auditLogService.recordAction({ organizationId, userId, action, entityType: 'OnboardingTemplate', entityId, metadata, ...reqMeta });
+}
 
 const DEFAULTS = { page: 1, limit: 50, sortBy: 'createdAt', sortOrder: 'desc' };
 
@@ -65,7 +70,7 @@ function normalizeTasks(tasks = []) {
   }));
 }
 
-async function createTemplate(organizationId, payload, user) {
+async function createTemplate(organizationId, payload, user, reqMeta = {}) {
   const item = await OnboardingTemplate.create({
     organizationId: new Types.ObjectId(organizationId),
     name: payload.name,
@@ -76,10 +81,11 @@ async function createTemplate(organizationId, payload, user) {
     status: payload.status || 'ACTIVE',
     createdBy: user._id,
   });
+  await recordAudit(organizationId, user._id, 'TEMPLATE_CREATED', item._id, { type: item.type, taskCount: item.tasks.length }, reqMeta);
   return getTemplateById(organizationId, item._id);
 }
 
-async function updateTemplate(organizationId, id, payload) {
+async function updateTemplate(organizationId, id, payload, user, reqMeta = {}) {
   const item = await OnboardingTemplate.findOne({ _id: id, organizationId: new Types.ObjectId(organizationId) });
   if (!item) throw new AppError('Template not found', 404);
 
@@ -91,14 +97,17 @@ async function updateTemplate(organizationId, id, payload) {
   if (payload.status && ['ACTIVE', 'INACTIVE'].includes(payload.status)) item.status = payload.status;
 
   await item.save();
+  await recordAudit(organizationId, user._id, 'TEMPLATE_UPDATED', item._id, { changed: Object.keys(payload) }, reqMeta);
   return getTemplateById(organizationId, item._id);
 }
 
-async function deleteTemplate(organizationId, id) {
+async function deleteTemplate(organizationId, id, user, reqMeta = {}) {
   const item = await OnboardingTemplate.findOne({ _id: id, organizationId: new Types.ObjectId(organizationId) });
   if (!item) throw new AppError('Template not found', 404);
+  const previousStatus = item.status;
   item.status = 'INACTIVE';
   await item.save();
+  await recordAudit(organizationId, user._id, 'TEMPLATE_DEACTIVATED', item._id, { previousStatus }, reqMeta);
   return { success: true, message: 'Template deactivated' };
 }
 

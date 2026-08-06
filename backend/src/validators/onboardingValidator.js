@@ -10,6 +10,13 @@ const createProcess = [
   body('title').optional().trim(),
   body('startDate').optional({ checkFalsy: true }).isISO8601().withMessage('Invalid start date'),
   body('targetDate').optional({ checkFalsy: true }).isISO8601().withMessage('Invalid target date'),
+  body('targetDate').custom((target, { req }) => {
+    const start = req.body.startDate;
+    if (target && start && new Date(target) < new Date(start)) {
+      throw new Error('Target date cannot be before start date');
+    }
+    return true;
+  }),
   body('notes').optional().trim(),
   validate,
 ];
@@ -19,6 +26,13 @@ const updateProcess = [
   body('title').optional().trim().notEmpty().withMessage('Title cannot be empty'),
   body('startDate').optional({ checkFalsy: true }).isISO8601().withMessage('Invalid start date'),
   body('targetDate').optional({ checkFalsy: true }).isISO8601().withMessage('Invalid target date'),
+  body('targetDate').custom((target, { req }) => {
+    const start = req.body.startDate;
+    if (target && start && new Date(target) < new Date(start)) {
+      throw new Error('Target date cannot be before start date');
+    }
+    return true;
+  }),
   body('notes').optional().trim(),
   validate,
 ];

@@ -84,6 +84,12 @@ const SOCKET_EVENTS = {
   OFFER_ACCEPTED: 'offer:accepted',
   OFFER_REJECTED: 'offer:rejected',
   OFFER_WITHDRAWN: 'offer:withdrawn',
+  ONBOARDING_PROCESS_CREATED: 'onboarding:process-created',
+  ONBOARDING_PROCESS_UPDATED: 'onboarding:process-updated',
+  ONBOARDING_PROCESS_COMPLETED: 'onboarding:process-completed',
+  ONBOARDING_PROCESS_CANCELLED: 'onboarding:process-cancelled',
+  ONBOARDING_TASK_ASSIGNED: 'onboarding:task-assigned',
+  ONBOARDING_TASK_STATUS_CHANGED: 'onboarding:task-status-changed',
 };
 
 module.exports = SOCKET_EVENTS;
