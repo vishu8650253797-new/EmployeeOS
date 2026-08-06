@@ -1,6 +1,6 @@
 const { Types } = require('mongoose');
 const {
-  OnboardingProcess, OnboardingTask, OnboardingTemplate, Employee, User,
+  OnboardingProcess, OnboardingTask, OnboardingTemplate, DocumentRequest, Employee, User,
 } = require('../models');
 const AppError = require('../utils/AppError');
 const SOCKET_EVENTS = require('../utils/socketEvents');
@@ -9,6 +9,8 @@ const { getOrganizationRoom } = require('../socket/socketRooms');
 const { withTransaction } = require('../utils/withTransaction');
 const notificationService = require('./notificationService');
 const auditLogService = require('./auditLogService');
+const emailService = require('./emailService');
+const documentRequestService = require('./documentRequestService');
 const onboardingAccess = require('../utils/onboardingAccess');
 
 const DEFAULTS = { page: 1, limit: 50, sortBy: 'createdAt', sortOrder: 'desc' };
@@ -278,6 +280,14 @@ async function createProcess(organizationId, payload, user, reqMeta = {}) {
     );
   }
 
+  if (process.type === 'ONBOARDING') {
+    await emailService.sendWelcomeEmail({
+      to: employee.email,
+      employeeName: `${employee.firstName} ${employee.lastName}`,
+      startDate: process.startDate,
+    });
+  }
+
   return getProcessById(organizationId, process._id, user);
 }
 
@@ -350,6 +360,121 @@ async function cancelProcess(organizationId, id, user, reason, reqMeta = {}) {
       process._id
     );
   }
+
+  return getProcessById(organizationId, process._id, user);
+}
+
+async function confirmJoiningDate(organizationId, id, payload, user, reqMeta = {}) {
+  const process = await withTransaction(async (session) => {
+    const opts = session ? { session } : undefined;
+    const proc = await OnboardingProcess.findOne({ _id: id, organizationId: new Types.ObjectId(organizationId) }, null, opts);
+    if (!proc) throw new AppError('Process not found', 404);
+    if (['COMPLETED', 'CANCELLED'].includes(proc.status)) throw new AppError(`Cannot update a ${proc.status.toLowerCase()} process`, 400);
+    await onboardingAccess.canEditProcess(proc, user);
+
+    const previousStartDate = proc.startDate;
+    proc.startDate = new Date(payload.joiningDate);
+    if (proc.targetDate && proc.targetDate < proc.startDate) throw new AppError('Target date cannot be before start date', 400);
+    proc.joiningDateConfirmed = true;
+    proc.joiningDateConfirmedAt = new Date();
+    proc.joiningDateConfirmedBy = user._id;
+    await proc.save(opts);
+
+    let employeeSynced = false;
+    if (payload.syncToEmployee !== false) {
+      await Employee.updateOne(
+        { _id: proc.employeeId, organizationId: new Types.ObjectId(organizationId) },
+        { joiningDate: proc.startDate },
+        opts
+      );
+      employeeSynced = true;
+    }
+
+    await recordAudit(
+      organizationId, user._id, 'JOINING_DATE_CONFIRMED', 'OnboardingProcess', proc._id,
+      { previousStartDate, newStartDate: proc.startDate, employeeSynced }, reqMeta, session
+    );
+    return proc;
+  });
+
+  emitToOrg(organizationId, SOCKET_EVENTS.ONBOARDING_JOINING_DATE_CONFIRMED, {
+    processId: process._id.toString(), startDate: process.startDate,
+  });
+
+  const employee = await Employee.findById(process.employeeId).select('userId email firstName lastName').lean();
+  if (employee) {
+    if (employee.userId) {
+      await notifyUser(
+        employee.userId, organizationId, 'JOINING_DATE_CONFIRMED', 'Joining date confirmed',
+        `Your joining date has been set to ${process.startDate.toDateString()}`, 'OnboardingProcess', process._id
+      );
+    }
+    await emailService.sendJoiningDateConfirmedEmail({
+      to: employee.email,
+      employeeName: `${employee.firstName} ${employee.lastName}`,
+      joiningDate: process.startDate,
+    });
+  }
+
+  return getProcessById(organizationId, process._id, user);
+}
+
+async function triggerDocumentCollection(organizationId, processId, payload, user, reqMeta = {}) {
+  const orgId = new Types.ObjectId(organizationId);
+  const process = await OnboardingProcess.findOne({ _id: processId, organizationId: orgId });
+  if (!process) throw new AppError('Process not found', 404);
+  if (['COMPLETED', 'CANCELLED'].includes(process.status)) throw new AppError(`Cannot request documents on a ${process.status.toLowerCase()} process`, 400);
+  await onboardingAccess.canEditProcess(process, user);
+
+  let documents = payload.documents;
+  if (!documents || documents.length === 0) {
+    if (!process.templateId) throw new AppError('No required documents configured for this process', 400);
+    const template = await OnboardingTemplate.findOne({ _id: process.templateId, organizationId: orgId }).lean();
+    documents = template?.requiredDocuments || [];
+  }
+  if (!documents.length) throw new AppError('No required documents configured for this process', 400);
+
+  const existingRequests = await DocumentRequest.find({
+    processId: process._id,
+    status: { $ne: 'CANCELLED' },
+  }).select('categoryId').lean();
+  const alreadyRequested = new Set(existingRequests.map((r) => r.categoryId.toString()));
+
+  const created = [];
+  const skipped = [];
+  for (const doc of documents) {
+    const categoryId = (doc.categoryId || '').toString();
+    if (!categoryId || alreadyRequested.has(categoryId)) {
+      if (categoryId) skipped.push(categoryId);
+      continue;
+    }
+    const dueDate = addDays(process.startDate, doc.dueOffsetDays ?? 7);
+    // Not atomic as a whole (documentRequestService.createRequest isn't transactional today);
+    // each created request is individually consistent, and re-triggering skips duplicates.
+    const request = await documentRequestService.createRequest(
+      organizationId,
+      {
+        employeeId: process.employeeId.toString(),
+        categoryId,
+        processId: process._id.toString(),
+        title: doc.title,
+        description: doc.description,
+        priority: doc.priority,
+        dueDate,
+      },
+      user
+    );
+    created.push(request.id);
+    alreadyRequested.add(categoryId);
+  }
+
+  await recordAudit(
+    organizationId, user._id, 'REQUIRED_DOCUMENTS_REQUESTED', 'OnboardingProcess', process._id,
+    { createdCount: created.length, skippedCount: skipped.length, documentRequestIds: created }, reqMeta
+  );
+  emitToOrg(orgId, SOCKET_EVENTS.ONBOARDING_DOCUMENTS_REQUESTED, {
+    processId: process._id.toString(), createdCount: created.length, skippedCount: skipped.length,
+  });
 
   return getProcessById(organizationId, process._id, user);
 }
@@ -570,6 +695,8 @@ module.exports = {
   createProcess,
   updateProcess,
   cancelProcess,
+  confirmJoiningDate,
+  triggerDocumentCollection,
   addTask,
   updateTask,
   updateTaskStatus,

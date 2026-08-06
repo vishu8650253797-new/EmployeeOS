@@ -1,8 +1,20 @@
 const { Types } = require('mongoose');
 const { Employee, Department } = require('../models');
 const AppError = require('../utils/AppError');
+const { withTransaction } = require('../utils/withTransaction');
+const auditLogService = require('./auditLogService');
+const storageService = require('./storage');
+const { getExtension, matchesFileSignature, EXTENSION_MIME_MAP } = require('../utils/fileValidation');
 
 const DEFAULTS = { page: 1, limit: 10, sortBy: 'createdAt', sortOrder: 'desc' };
+const ELEVATED_ROLES = ['SUPER_ADMIN', 'HR_ADMIN'];
+const AVATAR_EXTENSIONS = ['jpg', 'jpeg', 'png'];
+
+function assertSelfOrHR(actor, employeeId) {
+  if (ELEVATED_ROLES.includes(actor.role)) return;
+  if (actor.employeeId && actor.employeeId.toString() === employeeId.toString()) return;
+  throw new AppError('You are not authorized to access this employee record', 403);
+}
 
 function buildLocation(address = {}) {
   const { city, country } = address;
@@ -194,10 +206,171 @@ async function deleteEmployee(organizationId, id) {
   return { success: true, message: 'Employee removed successfully' };
 }
 
+async function findActiveEmployee(organizationId, id, selectFields) {
+  const query = Employee.findOne({
+    _id: id,
+    organizationId: new Types.ObjectId(organizationId),
+    isDeleted: { $ne: true },
+  });
+  if (selectFields) query.select(selectFields);
+  const employee = await query;
+  if (!employee) throw new AppError('Employee not found', 404);
+  return employee;
+}
+
+async function getBankDetails(organizationId, id, actor) {
+  assertSelfOrHR(actor, id);
+  const employee = await findActiveEmployee(organizationId, id, '+bankDetails.accountNumber');
+  return employee.bankDetails || {};
+}
+
+async function updateBankDetails(organizationId, id, payload, actor, reqMeta = {}) {
+  assertSelfOrHR(actor, id);
+  const employee = await withTransaction(async (session) => {
+    const opts = session ? { session } : undefined;
+    const emp = await Employee.findOne(
+      { _id: id, organizationId: new Types.ObjectId(organizationId), isDeleted: { $ne: true } },
+      null,
+      opts
+    );
+    if (!emp) throw new AppError('Employee not found', 404);
+
+    const fields = ['accountHolderName', 'accountNumber', 'bankName', 'branchName', 'routingCode', 'currency'];
+    fields.forEach((f) => {
+      if (payload[f] !== undefined) emp.bankDetails[f] = payload[f];
+    });
+    emp.bankDetails.updatedAt = new Date();
+    emp.bankDetails.updatedBy = actor._id;
+    await emp.save(opts);
+
+    await auditLogService.recordAction({
+      organizationId, userId: actor._id, action: 'EMPLOYEE_BANK_DETAILS_UPDATED',
+      entityType: 'Employee', entityId: emp._id,
+      metadata: { fieldsChanged: fields.filter((f) => payload[f] !== undefined) },
+      session, ...reqMeta,
+    });
+    return emp;
+  });
+  return getBankDetails(organizationId, employee._id, actor);
+}
+
+async function getTaxInfo(organizationId, id, actor) {
+  assertSelfOrHR(actor, id);
+  const employee = await findActiveEmployee(organizationId, id, '+taxInfo.taxId');
+  return employee.taxInfo || {};
+}
+
+async function updateTaxInfo(organizationId, id, payload, actor, reqMeta = {}) {
+  assertSelfOrHR(actor, id);
+  const employee = await withTransaction(async (session) => {
+    const opts = session ? { session } : undefined;
+    const emp = await Employee.findOne(
+      { _id: id, organizationId: new Types.ObjectId(organizationId), isDeleted: { $ne: true } },
+      null,
+      opts
+    );
+    if (!emp) throw new AppError('Employee not found', 404);
+
+    const fields = ['taxId', 'taxRegime', 'taxCountry'];
+    fields.forEach((f) => {
+      if (payload[f] !== undefined) emp.taxInfo[f] = payload[f];
+    });
+    emp.taxInfo.updatedAt = new Date();
+    emp.taxInfo.updatedBy = actor._id;
+    await emp.save(opts);
+
+    await auditLogService.recordAction({
+      organizationId, userId: actor._id, action: 'EMPLOYEE_TAX_INFO_UPDATED',
+      entityType: 'Employee', entityId: emp._id,
+      metadata: { fieldsChanged: fields.filter((f) => payload[f] !== undefined) },
+      session, ...reqMeta,
+    });
+    return emp;
+  });
+  return getTaxInfo(organizationId, employee._id, actor);
+}
+
+async function updatePhoto(organizationId, id, file, actor, reqMeta = {}) {
+  assertSelfOrHR(actor, id);
+  if (!file) throw new AppError('A photo file is required', 400);
+
+  const extension = getExtension(file.originalname);
+  if (!extension || !AVATAR_EXTENSIONS.includes(extension)) {
+    throw new AppError('Profile photo must be a JPG or PNG image', 400);
+  }
+  const expectedMimeTypes = EXTENSION_MIME_MAP[extension];
+  if (!expectedMimeTypes || !expectedMimeTypes.includes(file.mimetype)) {
+    throw new AppError('File content type does not match its extension', 400);
+  }
+  if (!matchesFileSignature(file.buffer, extension)) {
+    throw new AppError('File content does not match its declared type', 400);
+  }
+
+  const previous = await findActiveEmployee(organizationId, id, '+avatarStorageKey');
+  const previousStorageKey = previous.avatarStorageKey;
+
+  const { storageKey } = await storageService.uploadAvatar({
+    buffer: file.buffer, organizationId, employeeId: id, extension,
+  });
+
+  const employee = await withTransaction(async (session) => {
+    const opts = session ? { session } : undefined;
+    const emp = await Employee.findOne(
+      { _id: id, organizationId: new Types.ObjectId(organizationId), isDeleted: { $ne: true } },
+      null,
+      opts
+    );
+    if (!emp) throw new AppError('Employee not found', 404);
+
+    emp.avatarStorageKey = storageKey;
+    emp.avatarMimeType = file.mimetype;
+    emp.avatar = `/api/employees/${id}/photo`;
+    await emp.save(opts);
+
+    await auditLogService.recordAction({
+      organizationId, userId: actor._id, action: 'EMPLOYEE_PHOTO_UPDATED',
+      entityType: 'Employee', entityId: emp._id,
+      metadata: { fileSize: file.size, mimeType: file.mimetype },
+      session, ...reqMeta,
+    });
+    return emp;
+  });
+
+  if (previousStorageKey && previousStorageKey !== storageKey) {
+    try {
+      await storageService.deleteFile(previousStorageKey);
+    } catch (err) {
+      console.error('[employee] failed to delete previous avatar:', err.message);
+    }
+  }
+
+  return getEmployeeById(organizationId, employee._id);
+}
+
+async function getPhoto(organizationId, id, actor) {
+  assertSelfOrHR(actor, id);
+  const employee = await findActiveEmployee(organizationId, id, '+avatarStorageKey +avatarMimeType');
+  if (!employee.avatarStorageKey) throw new AppError('No profile photo uploaded for this employee', 404);
+
+  const { stream, size } = await storageService.getFileStream(employee.avatarStorageKey);
+  return {
+    stream,
+    size,
+    mimeType: employee.avatarMimeType || 'application/octet-stream',
+    filename: `${employee.firstName}-${employee.lastName}-photo`.replace(/\s+/g, '-'),
+  };
+}
+
 module.exports = {
   getEmployees,
   getEmployeeById,
   createEmployee,
   updateEmployee,
   deleteEmployee,
+  getBankDetails,
+  updateBankDetails,
+  getTaxInfo,
+  updateTaxInfo,
+  updatePhoto,
+  getPhoto,
 };

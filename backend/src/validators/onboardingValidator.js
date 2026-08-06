@@ -43,6 +43,26 @@ const cancelProcess = [
   validate,
 ];
 
+const confirmJoiningDate = [
+  param('id').isMongoId().withMessage('Invalid process ID'),
+  body('joiningDate').isISO8601().withMessage('Valid joining date is required'),
+  body('syncToEmployee').optional().isBoolean().withMessage('syncToEmployee must be a boolean'),
+  validate,
+];
+
+const DOCUMENT_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
+
+const triggerDocumentCollection = [
+  param('id').isMongoId().withMessage('Invalid process ID'),
+  body('documents').optional().isArray().withMessage('documents must be an array'),
+  body('documents.*.categoryId').isMongoId().withMessage('Each document needs a valid categoryId'),
+  body('documents.*.title').trim().notEmpty().withMessage('Each document needs a title'),
+  body('documents.*.description').optional().trim(),
+  body('documents.*.priority').optional().isIn(DOCUMENT_PRIORITIES).withMessage('Invalid document priority'),
+  body('documents.*.dueOffsetDays').optional().isInt({ min: 0 }).withMessage('dueOffsetDays must be a non-negative integer'),
+  validate,
+];
+
 const addTask = [
   param('id').isMongoId().withMessage('Invalid process ID'),
   body('title').trim().notEmpty().withMessage('Task title is required'),
@@ -77,4 +97,7 @@ const byId = [param('id').isMongoId().withMessage('Invalid process ID'), validat
 
 const byTaskId = [param('taskId').isMongoId().withMessage('Invalid task ID'), validate];
 
-module.exports = { createProcess, updateProcess, cancelProcess, addTask, updateTask, updateTaskStatus, byId, byTaskId };
+module.exports = {
+  createProcess, updateProcess, cancelProcess, confirmJoiningDate, triggerDocumentCollection,
+  addTask, updateTask, updateTaskStatus, byId, byTaskId,
+};

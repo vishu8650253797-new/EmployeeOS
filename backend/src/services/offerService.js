@@ -7,6 +7,7 @@ const { getSocketInstance } = require('../socket/socketServer');
 const { getOrganizationRoom } = require('../socket/socketRooms');
 const auditLogService = require('./auditLogService');
 const notificationService = require('./notificationService');
+const emailService = require('./emailService');
 const { logActivity } = require('./candidateActivityService');
 
 const DEFAULTS = { page: 1, limit: 20 };
@@ -172,8 +173,17 @@ async function sendOffer(organizationId, id, actor, reqMeta = {}) {
 
   const dto = offer.toJSON();
   emitToOrg(organizationId, SOCKET_EVENTS.OFFER_SENT, dto);
-  // The public response link would normally be emailed to the candidate.
-  // Returned here so HR can share it manually until an email service is configured.
+
+  const publicResponseUrl = `${process.env.CLIENT_URL || ''}/careers/offer/${offer.publicToken}`;
+  await emailService.sendOfferEmail({
+    to: offer.candidateId.email,
+    candidateName: `${offer.candidateId.firstName} ${offer.candidateId.lastName}`,
+    jobTitle: offer.jobId.title,
+    responseUrl: publicResponseUrl,
+    offerExpiryDate: offer.offerExpiryDate,
+  });
+
+  // Also returned here so HR can share it manually as a fallback (e.g. SMTP not configured).
   return { ...dto, publicResponseUrl: `/careers/offer/${offer.publicToken}` };
 }
 
@@ -229,7 +239,7 @@ async function getPublicOffer(token) {
 
 async function respondToPublicOffer(token, accept) {
   const offer = await JobOffer.findOne({ publicToken: token, status: 'SENT' })
-    .populate('candidateId', 'firstName lastName')
+    .populate('candidateId', 'firstName lastName email')
     .populate('jobId', 'title');
   if (!offer) throw new AppError('Offer not found or no longer available', 404);
   if (offer.offerExpiryDate && new Date(offer.offerExpiryDate) < new Date()) {
@@ -263,6 +273,13 @@ async function respondToPublicOffer(token, accept) {
     `${candidateName} ${accept ? 'accepted' : 'rejected'} the offer for ${offer.jobId.title}`,
     offer._id
   );
+
+  await emailService.sendOfferResponseConfirmationEmail({
+    to: offer.candidateId.email,
+    candidateName,
+    jobTitle: offer.jobId.title,
+    accepted: accept,
+  });
 
   emitToOrg(organizationId, accept ? SOCKET_EVENTS.OFFER_ACCEPTED : SOCKET_EVENTS.OFFER_REJECTED, {
     offerId: offer._id.toString(),

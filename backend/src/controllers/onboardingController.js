@@ -28,6 +28,16 @@ exports.cancelProcess = async (req, res) => {
   res.json({ success: true, message: 'Process cancelled', data });
 };
 
+exports.confirmJoiningDate = async (req, res) => {
+  const data = await onboardingService.confirmJoiningDate(req.organizationId, req.params.id, req.body, req.user, reqMeta(req));
+  res.json({ success: true, message: 'Joining date confirmed', data });
+};
+
+exports.triggerDocumentCollection = async (req, res) => {
+  const data = await onboardingService.triggerDocumentCollection(req.organizationId, req.params.id, req.body, req.user, reqMeta(req));
+  res.json({ success: true, message: 'Document collection triggered', data });
+};
+
 exports.addTask = async (req, res) => {
   const data = await onboardingService.addTask(req.organizationId, req.params.id, req.body, req.user, reqMeta(req));
   res.status(201).json({ success: true, message: 'Task added', data });

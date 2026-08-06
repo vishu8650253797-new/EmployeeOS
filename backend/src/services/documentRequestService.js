@@ -6,6 +6,7 @@ const { getSocketInstance } = require('../socket/socketServer');
 const { getDocumentRequestRoom } = require('../socket/socketRooms');
 const auditLogService = require('./auditLogService');
 const documentService = require('./documentService');
+const emailService = require('./emailService');
 
 const ELEVATED_DOC_ROLES = ['SUPER_ADMIN', 'HR_ADMIN'];
 const OPEN_STATUSES = ['PENDING', 'REJECTED'];
@@ -26,6 +27,7 @@ function toRequestDTO(request) {
   return {
     id: request._id.toString(),
     organizationId: request.organizationId.toString(),
+    processId: request.processId ? request.processId.toString() : null,
     employeeId: emp ? emp._id.toString() : request.employeeId.toString(),
     employeeName: emp ? `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || 'Unknown' : 'Unknown',
     categoryId: cat ? cat._id.toString() : request.categoryId.toString(),
@@ -87,6 +89,7 @@ async function listRequests(query, filters = {}) {
 async function getRequests(organizationId, filters) {
   const query = { organizationId: new Types.ObjectId(organizationId) };
   if (filters.employeeId) query.employeeId = new Types.ObjectId(filters.employeeId);
+  if (filters.processId) query.processId = new Types.ObjectId(filters.processId);
   return listRequests(query, filters);
 }
 
@@ -123,6 +126,7 @@ async function createRequest(organizationId, payload, actor) {
     organizationId: new Types.ObjectId(organizationId),
     employeeId: employee._id,
     categoryId: category._id,
+    processId: payload.processId || undefined,
     title: payload.title,
     description: payload.description || '',
     requestedBy: actor._id,
@@ -147,6 +151,13 @@ async function createRequest(organizationId, payload, actor) {
       entityId: request._id,
     });
   }
+
+  await emailService.sendDocumentRequestEmail({
+    to: employee.email,
+    employeeName: `${employee.firstName} ${employee.lastName}`,
+    title: payload.title,
+    dueDate: request.dueDate,
+  });
 
   const io = getSocketInstance();
   if (io) {

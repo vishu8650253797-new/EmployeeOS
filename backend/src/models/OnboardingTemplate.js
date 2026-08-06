@@ -17,6 +17,20 @@ const templateTaskSchema = new Schema(
   { _id: true }
 );
 
+const DOCUMENT_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
+
+const requiredDocumentSchema = new Schema(
+  {
+    categoryId: { type: Schema.Types.ObjectId, ref: 'DocumentCategory', required: true },
+    title: { type: String, required: true, trim: true },
+    description: { type: String, trim: true },
+    priority: { type: String, enum: DOCUMENT_PRIORITIES, default: 'MEDIUM' },
+    dueOffsetDays: { type: Number, default: 7, min: 0 },
+    isRequired: { type: Boolean, default: true },
+  },
+  { _id: true }
+);
+
 const onboardingTemplateSchema = new Schema(
   {
     organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
@@ -25,6 +39,7 @@ const onboardingTemplateSchema = new Schema(
     type: { type: String, enum: PROCESS_TYPES, required: true },
     departmentId: { type: Schema.Types.ObjectId, ref: 'Department' },
     tasks: { type: [templateTaskSchema], default: [] },
+    requiredDocuments: { type: [requiredDocumentSchema], default: [] },
     status: { type: String, enum: ['ACTIVE', 'INACTIVE'], default: 'ACTIVE' },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   },
@@ -45,3 +60,4 @@ module.exports = model('OnboardingTemplate', onboardingTemplateSchema);
 module.exports.PROCESS_TYPES = PROCESS_TYPES;
 module.exports.TASK_CATEGORIES = TASK_CATEGORIES;
 module.exports.ASSIGNEE_ROLES = ASSIGNEE_ROLES;
+module.exports.DOCUMENT_PRIORITIES = DOCUMENT_PRIORITIES;

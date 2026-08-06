@@ -19,6 +19,9 @@ const onboardingProcessSchema = new Schema(
     initiatedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     progress: { type: Number, default: 0, min: 0, max: 100 },
     notes: { type: String, trim: true },
+    joiningDateConfirmed: { type: Boolean, default: false },
+    joiningDateConfirmedAt: { type: Date },
+    joiningDateConfirmedBy: { type: Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }
 );

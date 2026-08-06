@@ -5,6 +5,7 @@ const documentRequestSchema = new Schema(
     organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
     employeeId: { type: Schema.Types.ObjectId, ref: 'Employee', required: true },
     categoryId: { type: Schema.Types.ObjectId, ref: 'DocumentCategory', required: true },
+    processId: { type: Schema.Types.ObjectId, ref: 'OnboardingProcess', index: true },
     title: { type: String, required: true, trim: true },
     description: { type: String, trim: true },
     requestedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },

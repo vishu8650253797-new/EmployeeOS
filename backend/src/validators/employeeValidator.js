@@ -85,4 +85,28 @@ const getById = [
   validate,
 ];
 
-module.exports = { create, update, getById };
+const updateBankDetails = [
+  param('id').isMongoId().withMessage('Invalid employee ID'),
+  body('accountHolderName').optional().trim(),
+  body('accountNumber').optional().trim(),
+  body('bankName').optional().trim(),
+  body('branchName').optional().trim(),
+  body('routingCode').optional().trim(),
+  body('currency').optional().trim(),
+  validate,
+];
+
+const updateTaxInfo = [
+  param('id').isMongoId().withMessage('Invalid employee ID'),
+  body('taxId').optional().trim(),
+  body('taxRegime').optional().trim(),
+  body('taxCountry').optional().trim(),
+  validate,
+];
+
+const photoValidator = [
+  param('id').isMongoId().withMessage('Invalid employee ID'),
+  validate,
+];
+
+module.exports = { create, update, getById, updateBankDetails, updateTaxInfo, photoValidator };

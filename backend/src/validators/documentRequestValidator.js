@@ -4,6 +4,7 @@ const { validate } = require('./index');
 const create = [
   body('employeeId').isMongoId().withMessage('Valid employee ID is required'),
   body('categoryId').isMongoId().withMessage('Valid category ID is required'),
+  body('processId').optional({ checkFalsy: true }).isMongoId().withMessage('Invalid process ID'),
   body('title').trim().notEmpty().withMessage('Request title is required'),
   body('description').optional().trim(),
   body('priority').optional().isIn(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).withMessage('Invalid priority'),

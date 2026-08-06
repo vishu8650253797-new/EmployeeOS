@@ -3,6 +3,7 @@ const { validate } = require('./index');
 
 const TASK_CATEGORIES = ['DOCUMENTATION', 'IT_SETUP', 'TRAINING', 'HR', 'FINANCE', 'FACILITIES', 'COMPLIANCE', 'HANDOVER', 'OTHER'];
 const ASSIGNEE_ROLES = ['HR_ADMIN', 'MANAGER', 'IT_ADMIN', 'FINANCE', 'EMPLOYEE'];
+const DOCUMENT_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
 const taskRules = (prefix) => [
   body(`${prefix}.*.title`).trim().notEmpty().withMessage('Each task requires a title'),
@@ -14,6 +15,15 @@ const taskRules = (prefix) => [
   body(`${prefix}.*.isRequired`).optional().isBoolean().withMessage('isRequired must be a boolean'),
 ];
 
+const requiredDocumentRules = (prefix) => [
+  body(`${prefix}.*.categoryId`).isMongoId().withMessage('Each required document needs a valid categoryId'),
+  body(`${prefix}.*.title`).trim().notEmpty().withMessage('Each required document needs a title'),
+  body(`${prefix}.*.description`).optional().trim(),
+  body(`${prefix}.*.priority`).optional().isIn(DOCUMENT_PRIORITIES).withMessage('Invalid document priority'),
+  body(`${prefix}.*.dueOffsetDays`).optional().isInt({ min: 0 }).withMessage('dueOffsetDays must be a non-negative integer'),
+  body(`${prefix}.*.isRequired`).optional().isBoolean().withMessage('isRequired must be a boolean'),
+];
+
 const create = [
   body('name').trim().notEmpty().withMessage('Template name is required'),
   body('type').isIn(['ONBOARDING', 'OFFBOARDING']).withMessage('Type must be ONBOARDING or OFFBOARDING'),
@@ -21,6 +31,8 @@ const create = [
   body('departmentId').optional({ checkFalsy: true }).isMongoId().withMessage('Invalid department ID'),
   body('tasks').optional().isArray().withMessage('Tasks must be an array'),
   ...taskRules('tasks'),
+  body('requiredDocuments').optional().isArray().withMessage('requiredDocuments must be an array'),
+  ...requiredDocumentRules('requiredDocuments'),
   body('status').optional().isIn(['ACTIVE', 'INACTIVE']).withMessage('Invalid status'),
   validate,
 ];
@@ -33,6 +45,8 @@ const update = [
   body('departmentId').optional({ checkFalsy: true }).isMongoId().withMessage('Invalid department ID'),
   body('tasks').optional().isArray().withMessage('Tasks must be an array'),
   ...taskRules('tasks'),
+  body('requiredDocuments').optional().isArray().withMessage('requiredDocuments must be an array'),
+  ...requiredDocumentRules('requiredDocuments'),
   body('status').optional().isIn(['ACTIVE', 'INACTIVE']).withMessage('Invalid status'),
   validate,
 ];

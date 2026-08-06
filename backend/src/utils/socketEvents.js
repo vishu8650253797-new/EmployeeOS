@@ -90,6 +90,8 @@ const SOCKET_EVENTS = {
   ONBOARDING_PROCESS_CANCELLED: 'onboarding:process-cancelled',
   ONBOARDING_TASK_ASSIGNED: 'onboarding:task-assigned',
   ONBOARDING_TASK_STATUS_CHANGED: 'onboarding:task-status-changed',
+  ONBOARDING_JOINING_DATE_CONFIRMED: 'onboarding:joining-date-confirmed',
+  ONBOARDING_DOCUMENTS_REQUESTED: 'onboarding:documents-requested',
 };
 
 module.exports = SOCKET_EVENTS;

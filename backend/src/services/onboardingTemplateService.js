@@ -43,7 +43,12 @@ async function getTemplates(organizationId, filters = {}) {
     OnboardingTemplate.countDocuments(query),
   ]);
 
-  const items = data.map((i) => ({ ...i, id: i._id.toString(), taskCount: (i.tasks || []).length }));
+  const items = data.map((i) => ({
+    ...i,
+    id: i._id.toString(),
+    taskCount: (i.tasks || []).length,
+    requiredDocumentCount: (i.requiredDocuments || []).length,
+  }));
   return {
     data: items,
     pagination: { page: pageNum, limit: limitNum, total, totalPages: Math.ceil(total / limitNum) },
@@ -54,9 +59,15 @@ async function getTemplateById(organizationId, id) {
   const item = await OnboardingTemplate.findOne({ _id: id, organizationId: new Types.ObjectId(organizationId) })
     .populate('departmentId', 'name')
     .populate('createdBy', 'firstName lastName')
+    .populate('requiredDocuments.categoryId', 'name code')
     .lean();
   if (!item) throw new AppError('Template not found', 404);
-  return { ...item, id: item._id.toString(), taskCount: (item.tasks || []).length };
+  return {
+    ...item,
+    id: item._id.toString(),
+    taskCount: (item.tasks || []).length,
+    requiredDocumentCount: (item.requiredDocuments || []).length,
+  };
 }
 
 function normalizeTasks(tasks = []) {
@@ -71,6 +82,17 @@ function normalizeTasks(tasks = []) {
   }));
 }
 
+function normalizeRequiredDocuments(documents = []) {
+  return documents.map((d) => ({
+    categoryId: d.categoryId,
+    title: d.title,
+    description: d.description || '',
+    priority: d.priority || 'MEDIUM',
+    dueOffsetDays: Number.isFinite(Number(d.dueOffsetDays)) ? Math.max(Number(d.dueOffsetDays), 0) : 7,
+    isRequired: d.isRequired !== false,
+  }));
+}
+
 async function createTemplate(organizationId, payload, user, reqMeta = {}) {
   const item = await withTransaction(async (session) => {
     const opts = session ? { session } : undefined;
@@ -82,6 +104,7 @@ async function createTemplate(organizationId, payload, user, reqMeta = {}) {
         type: payload.type,
         departmentId: payload.departmentId || undefined,
         tasks: normalizeTasks(payload.tasks),
+        requiredDocuments: normalizeRequiredDocuments(payload.requiredDocuments),
         status: payload.status || 'ACTIVE',
         createdBy: user._id,
       }],
@@ -104,6 +127,7 @@ async function updateTemplate(organizationId, id, payload, user, reqMeta = {}) {
     if (payload.type && ['ONBOARDING', 'OFFBOARDING'].includes(payload.type)) template.type = payload.type;
     if (payload.departmentId !== undefined) template.departmentId = payload.departmentId || undefined;
     if (payload.tasks !== undefined) template.tasks = normalizeTasks(payload.tasks);
+    if (payload.requiredDocuments !== undefined) template.requiredDocuments = normalizeRequiredDocuments(payload.requiredDocuments);
     if (payload.status && ['ACTIVE', 'INACTIVE'].includes(payload.status)) template.status = payload.status;
 
     await template.save(opts);

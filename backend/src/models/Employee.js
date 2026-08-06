@@ -25,6 +25,33 @@ const addressSchema = new Schema(
   { _id: false }
 );
 
+// Sensitive: `select: false` keeps these off every default find/lean/toJSON.
+// Not encrypted at rest — a known, deliberately deferred gap (see Step 10B-1 plan).
+const bankDetailsSchema = new Schema(
+  {
+    accountHolderName: { type: String, trim: true },
+    accountNumber: { type: String, trim: true, select: false },
+    bankName: { type: String, trim: true },
+    branchName: { type: String, trim: true },
+    routingCode: { type: String, trim: true }, // generic: IFSC / ABA routing / SWIFT / sort code
+    currency: { type: String, trim: true },
+    updatedAt: { type: Date },
+    updatedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  },
+  { _id: false }
+);
+
+const taxInfoSchema = new Schema(
+  {
+    taxId: { type: String, trim: true, select: false }, // generic: PAN / SSN / NIN / TIN
+    taxRegime: { type: String, trim: true },
+    taxCountry: { type: String, trim: true },
+    updatedAt: { type: Date },
+    updatedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  },
+  { _id: false }
+);
+
 const employeeSchema = new Schema(
   {
     organizationId: { type: Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
@@ -48,6 +75,10 @@ const employeeSchema = new Schema(
     address: { type: addressSchema, default: {} },
     location: { type: String, trim: true },
     emergencyContact: { type: emergencyContactSchema, default: {} },
+    bankDetails: { type: bankDetailsSchema, default: {} },
+    taxInfo: { type: taxInfoSchema, default: {} },
+    avatarStorageKey: { type: String, select: false },
+    avatarMimeType: { type: String, select: false },
     isDeleted: { type: Boolean, default: false, index: true },
   },
   { timestamps: true }

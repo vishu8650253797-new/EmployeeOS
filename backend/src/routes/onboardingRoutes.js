@@ -4,7 +4,8 @@ const { authorize } = require('../middleware/roleMiddleware');
 const asyncHandler = require('../utils/asyncHandler');
 const onboardingController = require('../controllers/onboardingController');
 const {
-  createProcess, updateProcess, cancelProcess, addTask, updateTask, updateTaskStatus, byId, byTaskId,
+  createProcess, updateProcess, cancelProcess, confirmJoiningDate, triggerDocumentCollection,
+  addTask, updateTask, updateTaskStatus, byId, byTaskId,
 } = require('../validators/onboardingValidator');
 
 const router = Router();
@@ -15,6 +16,8 @@ router.post('/processes', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN'), 
 router.get('/processes/:id', authMiddleware, byId, asyncHandler(onboardingController.getProcessById));
 router.put('/processes/:id', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN'), updateProcess, asyncHandler(onboardingController.updateProcess));
 router.patch('/processes/:id/cancel', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN'), cancelProcess, asyncHandler(onboardingController.cancelProcess));
+router.patch('/processes/:id/joining-date', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN'), confirmJoiningDate, asyncHandler(onboardingController.confirmJoiningDate));
+router.post('/processes/:id/document-collection', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN'), triggerDocumentCollection, asyncHandler(onboardingController.triggerDocumentCollection));
 router.post('/processes/:id/tasks', authMiddleware, authorize('SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'), addTask, asyncHandler(onboardingController.addTask));
 
 // Tasks
