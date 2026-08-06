@@ -1,5 +1,5 @@
 const { Types } = require('mongoose');
-const { Employee, OnboardingProcess } = require('../models');
+const { Employee, OnboardingProcess, OnboardingTask } = require('../models');
 const AppError = require('./AppError');
 
 const FULL_ROLES = ['SUPER_ADMIN', 'HR_ADMIN'];
@@ -38,6 +38,11 @@ async function authorizeProcess(process, user) {
   ) {
     return true;
   }
+  // Anyone assigned a task in this process has legitimate reason to view it —
+  // otherwise a non-HR, non-manager assignee could update their own task via
+  // canEditTask and then get a 403 when the endpoint builds its response.
+  const isTaskAssignee = await OnboardingTask.exists({ processId: process._id, assigneeId: user._id });
+  if (isTaskAssignee) return true;
   throw new AppError('Forbidden: you do not have access to this process', 403);
 }
 

@@ -6,6 +6,7 @@ const AppError = require('../utils/AppError');
 const SOCKET_EVENTS = require('../utils/socketEvents');
 const { getSocketInstance } = require('../socket/socketServer');
 const { getOrganizationRoom } = require('../socket/socketRooms');
+const { withTransaction } = require('../utils/withTransaction');
 const notificationService = require('./notificationService');
 const auditLogService = require('./auditLogService');
 const onboardingAccess = require('../utils/onboardingAccess');
@@ -14,36 +15,49 @@ const DEFAULTS = { page: 1, limit: 50, sortBy: 'createdAt', sortOrder: 'desc' };
 const VALID_TASK_STATUSES = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'SKIPPED'];
 
 function emitToOrg(organizationId, event, payload) {
-  const io = getSocketInstance();
-  if (io) io.to(getOrganizationRoom(organizationId.toString())).emit(event, payload);
+  try {
+    const io = getSocketInstance();
+    if (io) io.to(getOrganizationRoom(organizationId.toString())).emit(event, payload);
+  } catch (err) {
+    console.error('[onboarding] socket emit failed:', err);
+  }
 }
 
-async function recordAudit(organizationId, userId, action, entityType, entityId, metadata = {}, reqMeta = {}) {
+async function recordAudit(organizationId, userId, action, entityType, entityId, metadata = {}, reqMeta = {}, session) {
   return auditLogService.recordAction({
-    organizationId, userId, action, entityType, entityId, metadata, ...reqMeta,
+    organizationId, userId, action, entityType, entityId, metadata, session, ...reqMeta,
   });
 }
 
+// Best-effort notifications: a failure here must never roll back or fail a mutation that already succeeded.
 async function notifyHR(organizationId, type, title, message, entityType, entityId) {
-  const hrUsers = await User.find({
-    organizationId: new Types.ObjectId(organizationId),
-    role: { $in: ['SUPER_ADMIN', 'HR_ADMIN'] },
-    status: 'active',
-  }).select('_id').lean();
-  await Promise.all(
-    hrUsers.map((u) =>
-      notificationService.createNotification({
-        organizationId, recipientId: u._id, type, title, message, entityType, entityId,
-      })
-    )
-  );
+  try {
+    const hrUsers = await User.find({
+      organizationId: new Types.ObjectId(organizationId),
+      role: { $in: ['SUPER_ADMIN', 'HR_ADMIN'] },
+      status: 'active',
+    }).select('_id').lean();
+    await Promise.all(
+      hrUsers.map((u) =>
+        notificationService.createNotification({
+          organizationId, recipientId: u._id, type, title, message, entityType, entityId,
+        })
+      )
+    );
+  } catch (err) {
+    console.error('[onboarding] notifyHR failed:', err);
+  }
 }
 
 async function notifyUser(userId, organizationId, type, title, message, entityType, entityId) {
   if (!userId) return;
-  await notificationService.createNotification({
-    organizationId, recipientId: userId, type, title, message, entityType, entityId,
-  });
+  try {
+    await notificationService.createNotification({
+      organizationId, recipientId: userId, type, title, message, entityType, entityId,
+    });
+  } catch (err) {
+    console.error('[onboarding] notifyUser failed:', err);
+  }
 }
 
 function safeSort(sortBy) {
@@ -57,11 +71,12 @@ function addDays(date, days) {
   return d;
 }
 
-async function recalculateProgress(processId) {
-  const process = await OnboardingProcess.findById(processId);
+async function recalculateProgress(processId, session) {
+  const opts = session ? { session } : undefined;
+  const process = await OnboardingProcess.findById(processId, null, opts);
   if (!process || ['CANCELLED'].includes(process.status)) return process;
 
-  const tasks = await OnboardingTask.find({ processId: process._id }).lean();
+  const tasks = await OnboardingTask.find({ processId: process._id }, null, opts).lean();
   const relevant = tasks.filter((t) => t.status !== 'SKIPPED');
   const completed = relevant.filter((t) => t.status === 'COMPLETED');
 
@@ -75,7 +90,7 @@ async function recalculateProgress(processId) {
     process.completedAt = undefined;
   }
 
-  await process.save();
+  await process.save(opts);
   return process;
 }
 
@@ -180,37 +195,62 @@ async function createProcess(organizationId, payload, user, reqMeta = {}) {
   const targetDate = payload.targetDate ? new Date(payload.targetDate) : undefined;
   if (targetDate && targetDate < startDate) throw new AppError('Target date cannot be before start date', 400);
 
-  const process = await OnboardingProcess.create({
-    organizationId: orgId,
-    employeeId: employee._id,
-    templateId: template ? template._id : undefined,
-    type: payload.type,
-    title:
-      payload.title ||
-      `${payload.type === 'ONBOARDING' ? 'Onboarding' : 'Offboarding'} — ${employee.firstName} ${employee.lastName}`,
-    startDate,
-    targetDate,
-    initiatedBy: user._id,
-    notes: payload.notes || '',
+  const taskInputs = template
+    ? await Promise.all(
+        template.tasks.map(async (t) => ({
+          title: t.title,
+          description: t.description,
+          category: t.category,
+          assigneeId: await resolveAssignee(orgId, t.defaultAssigneeRole, employee),
+          dueDate: addDays(startDate, t.dueOffsetDays || 0),
+          order: t.order,
+          isRequired: t.isRequired,
+        }))
+      )
+    : [];
+
+  const process = await withTransaction(async (session) => {
+    const opts = session ? { session } : undefined;
+
+    const [created] = await OnboardingProcess.create(
+      [{
+        organizationId: orgId,
+        employeeId: employee._id,
+        templateId: template ? template._id : undefined,
+        type: payload.type,
+        title:
+          payload.title ||
+          `${payload.type === 'ONBOARDING' ? 'Onboarding' : 'Offboarding'} — ${employee.firstName} ${employee.lastName}`,
+        startDate,
+        targetDate,
+        initiatedBy: user._id,
+        notes: payload.notes || '',
+      }],
+      opts
+    );
+
+    if (taskInputs.length > 0) {
+      await OnboardingTask.insertMany(
+        taskInputs.map((t) => ({ ...t, organizationId: orgId, processId: created._id })),
+        opts
+      );
+    }
+
+    await recordAudit(
+      organizationId,
+      user._id,
+      `${created.type}_PROCESS_CREATED`,
+      'OnboardingProcess',
+      created._id,
+      { templateId: template?._id?.toString(), employeeId: employee._id.toString() },
+      reqMeta,
+      session
+    );
+
+    return created;
   });
 
-  if (template && template.tasks.length > 0) {
-    const taskDocs = await Promise.all(
-      template.tasks.map(async (t) => ({
-        organizationId: orgId,
-        processId: process._id,
-        title: t.title,
-        description: t.description,
-        category: t.category,
-        assigneeId: await resolveAssignee(orgId, t.defaultAssigneeRole, employee),
-        dueDate: addDays(startDate, t.dueOffsetDays || 0),
-        order: t.order,
-        isRequired: t.isRequired,
-      }))
-    );
-    await OnboardingTask.insertMany(taskDocs);
-  }
-
+  // Post-commit side effects — best-effort, never fail the request over these.
   emitToOrg(
     orgId,
     SOCKET_EVENTS.ONBOARDING_PROCESS_CREATED,
@@ -238,31 +278,34 @@ async function createProcess(organizationId, payload, user, reqMeta = {}) {
     );
   }
 
-  await recordAudit(organizationId, user._id, `${process.type}_PROCESS_CREATED`, 'OnboardingProcess', process._id, { templateId: template?._id?.toString() }, reqMeta);
-
   return getProcessById(organizationId, process._id, user);
 }
 
 async function updateProcess(organizationId, id, payload, user, reqMeta = {}) {
-  const process = await OnboardingProcess.findOne({ _id: id, organizationId: new Types.ObjectId(organizationId) });
-  if (!process) throw new AppError('Process not found', 404);
-  if (['COMPLETED', 'CANCELLED'].includes(process.status)) throw new AppError(`Cannot update a ${process.status.toLowerCase()} process`, 400);
-  await onboardingAccess.canEditProcess(process, user);
+  const process = await withTransaction(async (session) => {
+    const opts = session ? { session } : undefined;
+    const proc = await OnboardingProcess.findOne({ _id: id, organizationId: new Types.ObjectId(organizationId) }, null, opts);
+    if (!proc) throw new AppError('Process not found', 404);
+    if (['COMPLETED', 'CANCELLED'].includes(proc.status)) throw new AppError(`Cannot update a ${proc.status.toLowerCase()} process`, 400);
+    await onboardingAccess.canEditProcess(proc, user);
 
-  if (payload.title) process.title = payload.title;
-  if (payload.startDate) {
-    process.startDate = new Date(payload.startDate);
-  }
-  if (payload.targetDate !== undefined) {
-    process.targetDate = payload.targetDate ? new Date(payload.targetDate) : undefined;
-  }
-  if (process.targetDate && process.targetDate < process.startDate) {
-    throw new AppError('Target date cannot be before start date', 400);
-  }
-  if (payload.notes !== undefined) process.notes = payload.notes;
+    if (payload.title) proc.title = payload.title;
+    if (payload.startDate) {
+      proc.startDate = new Date(payload.startDate);
+    }
+    if (payload.targetDate !== undefined) {
+      proc.targetDate = payload.targetDate ? new Date(payload.targetDate) : undefined;
+    }
+    if (proc.targetDate && proc.targetDate < proc.startDate) {
+      throw new AppError('Target date cannot be before start date', 400);
+    }
+    if (payload.notes !== undefined) proc.notes = payload.notes;
 
-  await process.save();
-  await recordAudit(organizationId, user._id, 'PROCESS_UPDATED', 'OnboardingProcess', process._id, { changes: Object.keys(payload) }, reqMeta);
+    await proc.save(opts);
+    await recordAudit(organizationId, user._id, 'PROCESS_UPDATED', 'OnboardingProcess', proc._id, { changes: Object.keys(payload) }, reqMeta, session);
+    return proc;
+  });
+
   emitToOrg(
     organizationId,
     SOCKET_EVENTS.ONBOARDING_PROCESS_UPDATED,
@@ -272,18 +315,23 @@ async function updateProcess(organizationId, id, payload, user, reqMeta = {}) {
 }
 
 async function cancelProcess(organizationId, id, user, reason, reqMeta = {}) {
-  const process = await OnboardingProcess.findOne({ _id: id, organizationId: new Types.ObjectId(organizationId) });
-  if (!process) throw new AppError('Process not found', 404);
-  if (['COMPLETED', 'CANCELLED'].includes(process.status)) throw new AppError(`Process is already ${process.status.toLowerCase()}`, 400);
-  await onboardingAccess.canEditProcess(process, user);
+  const process = await withTransaction(async (session) => {
+    const opts = session ? { session } : undefined;
+    const proc = await OnboardingProcess.findOne({ _id: id, organizationId: new Types.ObjectId(organizationId) }, null, opts);
+    if (!proc) throw new AppError('Process not found', 404);
+    if (['COMPLETED', 'CANCELLED'].includes(proc.status)) throw new AppError(`Process is already ${proc.status.toLowerCase()}`, 400);
+    await onboardingAccess.canEditProcess(proc, user);
 
-  process.status = 'CANCELLED';
-  process.cancelledAt = new Date();
-  process.cancelledBy = user._id;
-  process.cancellationReason = reason || '';
-  await process.save();
+    proc.status = 'CANCELLED';
+    proc.cancelledAt = new Date();
+    proc.cancelledBy = user._id;
+    proc.cancellationReason = reason || '';
+    await proc.save(opts);
 
-  await recordAudit(organizationId, user._id, 'PROCESS_CANCELLED', 'OnboardingProcess', process._id, { reason }, reqMeta);
+    await recordAudit(organizationId, user._id, 'PROCESS_CANCELLED', 'OnboardingProcess', proc._id, { reason }, reqMeta, session);
+    return proc;
+  });
+
   emitToOrg(
     organizationId,
     SOCKET_EVENTS.ONBOARDING_PROCESS_CANCELLED,
@@ -308,33 +356,42 @@ async function cancelProcess(organizationId, id, user, reason, reqMeta = {}) {
 
 async function addTask(organizationId, processId, payload, user, reqMeta = {}) {
   const orgId = new Types.ObjectId(organizationId);
-  const process = await OnboardingProcess.findOne({ _id: processId, organizationId: orgId });
-  if (!process) throw new AppError('Process not found', 404);
-  if (['COMPLETED', 'CANCELLED'].includes(process.status)) throw new AppError(`Cannot add tasks to a ${process.status.toLowerCase()} process`, 400);
-  await onboardingAccess.canEditProcess(process, user);
 
-  const lastTask = await OnboardingTask.findOne({ processId: process._id }).sort({ order: -1 }).lean();
+  const { task, process } = await withTransaction(async (session) => {
+    const opts = session ? { session } : undefined;
+    const proc = await OnboardingProcess.findOne({ _id: processId, organizationId: orgId }, null, opts);
+    if (!proc) throw new AppError('Process not found', 404);
+    if (['COMPLETED', 'CANCELLED'].includes(proc.status)) throw new AppError(`Cannot add tasks to a ${proc.status.toLowerCase()} process`, 400);
+    await onboardingAccess.canEditProcess(proc, user);
 
-  const task = await OnboardingTask.create({
-    organizationId: orgId,
-    processId: process._id,
-    title: payload.title,
-    description: payload.description || '',
-    category: payload.category || 'OTHER',
-    assigneeId: payload.assigneeId || undefined,
-    dueDate: payload.dueDate ? new Date(payload.dueDate) : undefined,
-    order: lastTask ? lastTask.order + 1 : 0,
-    isRequired: payload.isRequired !== false,
-    notes: payload.notes || '',
+    const lastTask = await OnboardingTask.findOne({ processId: proc._id }, null, opts).sort({ order: -1 });
+
+    const [createdTask] = await OnboardingTask.create(
+      [{
+        organizationId: orgId,
+        processId: proc._id,
+        title: payload.title,
+        description: payload.description || '',
+        category: payload.category || 'OTHER',
+        assigneeId: payload.assigneeId || undefined,
+        dueDate: payload.dueDate ? new Date(payload.dueDate) : undefined,
+        order: lastTask ? lastTask.order + 1 : 0,
+        isRequired: payload.isRequired !== false,
+        notes: payload.notes || '',
+      }],
+      opts
+    );
+
+    if (proc.status === 'NOT_STARTED') {
+      proc.status = 'IN_PROGRESS';
+      await proc.save(opts);
+    }
+
+    await recalculateProgress(proc._id, session);
+    await recordAudit(organizationId, user._id, 'TASK_ADDED', 'OnboardingTask', createdTask._id, { processId: proc._id.toString(), assigneeId: createdTask.assigneeId?.toString() }, reqMeta, session);
+
+    return { task: createdTask, process: proc };
   });
-
-  if (process.status === 'NOT_STARTED') {
-    process.status = 'IN_PROGRESS';
-    await process.save();
-  }
-
-  await recalculateProgress(process._id);
-  await recordAudit(organizationId, user._id, 'TASK_ADDED', 'OnboardingTask', task._id, { processId: process._id.toString(), assigneeId: task.assigneeId?.toString() }, reqMeta);
 
   if (task.assigneeId && task.assigneeId.toString() !== user._id.toString()) {
     await notifyUser(
@@ -355,23 +412,29 @@ async function addTask(organizationId, processId, payload, user, reqMeta = {}) {
 }
 
 async function updateTask(organizationId, taskId, payload, user, reqMeta = {}) {
-  const task = await OnboardingTask.findOne({ _id: taskId, organizationId: new Types.ObjectId(organizationId) });
-  if (!task) throw new AppError('Task not found', 404);
+  const { task, process, previousAssignee } = await withTransaction(async (session) => {
+    const opts = session ? { session } : undefined;
+    const t = await OnboardingTask.findOne({ _id: taskId, organizationId: new Types.ObjectId(organizationId) }, null, opts);
+    if (!t) throw new AppError('Task not found', 404);
 
-  const previousAssignee = task.assigneeId ? task.assigneeId.toString() : null;
-  const process = await OnboardingProcess.findById(task.processId);
-  if (!process || ['COMPLETED', 'CANCELLED'].includes(process.status)) throw new AppError(`Cannot edit tasks in a ${process?.status?.toLowerCase() || 'unknown'} process`, 400);
-  await onboardingAccess.canEditTask(task, user);
+    const prevAssignee = t.assigneeId ? t.assigneeId.toString() : null;
+    const proc = await OnboardingProcess.findById(t.processId, null, opts);
+    if (!proc || ['COMPLETED', 'CANCELLED'].includes(proc.status)) throw new AppError(`Cannot edit tasks in a ${proc?.status?.toLowerCase() || 'unknown'} process`, 400);
+    await onboardingAccess.canEditTask(t, user);
 
-  if (payload.title) task.title = payload.title;
-  if (payload.description !== undefined) task.description = payload.description;
-  if (payload.category) task.category = payload.category;
-  if (payload.assigneeId !== undefined) task.assigneeId = payload.assigneeId || undefined;
-  if (payload.dueDate !== undefined) task.dueDate = payload.dueDate ? new Date(payload.dueDate) : undefined;
-  if (payload.isRequired !== undefined) task.isRequired = payload.isRequired;
-  if (payload.notes !== undefined) task.notes = payload.notes;
+    if (payload.title) t.title = payload.title;
+    if (payload.description !== undefined) t.description = payload.description;
+    if (payload.category) t.category = payload.category;
+    if (payload.assigneeId !== undefined) t.assigneeId = payload.assigneeId || undefined;
+    if (payload.dueDate !== undefined) t.dueDate = payload.dueDate ? new Date(payload.dueDate) : undefined;
+    if (payload.isRequired !== undefined) t.isRequired = payload.isRequired;
+    if (payload.notes !== undefined) t.notes = payload.notes;
 
-  await task.save();
+    await t.save(opts);
+    await recordAudit(organizationId, user._id, 'TASK_UPDATED', 'OnboardingTask', t._id, { changed: Object.keys(payload) }, reqMeta, session);
+
+    return { task: t, process: proc, previousAssignee: prevAssignee };
+  });
 
   const newAssignee = task.assigneeId ? task.assigneeId.toString() : null;
   if (newAssignee && newAssignee !== previousAssignee && newAssignee !== user._id.toString()) {
@@ -389,79 +452,85 @@ async function updateTask(organizationId, taskId, payload, user, reqMeta = {}) {
     });
   }
 
-  await recordAudit(organizationId, user._id, 'TASK_UPDATED', 'OnboardingTask', task._id, { changed: Object.keys(payload) }, reqMeta);
   return getProcessById(organizationId, task.processId, user);
 }
 
 async function updateTaskStatus(organizationId, taskId, status, user, reqMeta = {}) {
-  const task = await OnboardingTask.findOne({ _id: taskId, organizationId: new Types.ObjectId(organizationId) });
-  if (!task) throw new AppError('Task not found', 404);
-  await onboardingAccess.canEditTask(task, user);
+  const { task, process, previousStatus } = await withTransaction(async (session) => {
+    const opts = session ? { session } : undefined;
+    const t = await OnboardingTask.findOne({ _id: taskId, organizationId: new Types.ObjectId(organizationId) }, null, opts);
+    if (!t) throw new AppError('Task not found', 404);
+    await onboardingAccess.canEditTask(t, user);
 
-  const process = await OnboardingProcess.findById(task.processId);
-  if (process && process.status === 'CANCELLED') throw new AppError('Cannot update tasks of a cancelled process', 400);
-  if (process && ['NOT_STARTED'].includes(process.status)) {
-    process.status = 'IN_PROGRESS';
-    await process.save();
-  }
+    const proc = await OnboardingProcess.findById(t.processId, null, opts);
+    if (proc && proc.status === 'CANCELLED') throw new AppError('Cannot update tasks of a cancelled process', 400);
+    if (proc && proc.status === 'NOT_STARTED') {
+      proc.status = 'IN_PROGRESS';
+      await proc.save(opts);
+    }
 
-  const previousStatus = task.status;
-  if (!VALID_TASK_STATUSES.includes(status)) {
-    throw new AppError(`Invalid task status ${status}`, 400);
-  }
-  if (status === previousStatus) {
-    throw new AppError(`Task is already ${previousStatus.toLowerCase()}`, 400);
-  }
-  if (status === 'SKIPPED' && task.isRequired) {
-    throw new AppError('Required tasks cannot be skipped', 400);
-  }
+    const prevStatus = t.status;
+    if (!VALID_TASK_STATUSES.includes(status)) {
+      throw new AppError(`Invalid task status ${status}`, 400);
+    }
+    if (status === prevStatus) {
+      throw new AppError(`Task is already ${prevStatus.toLowerCase()}`, 400);
+    }
+    if (status === 'SKIPPED' && t.isRequired) {
+      throw new AppError('Required tasks cannot be skipped', 400);
+    }
 
-  task.status = status;
-  if (status === 'COMPLETED') {
-    task.completedAt = new Date();
-    task.completedBy = user._id;
-  } else {
-    task.completedAt = undefined;
-    task.completedBy = undefined;
-  }
+    t.status = status;
+    if (status === 'COMPLETED') {
+      t.completedAt = new Date();
+      t.completedBy = user._id;
+    } else {
+      t.completedAt = undefined;
+      t.completedBy = undefined;
+    }
+    await t.save(opts);
 
-  await task.save();
-  await recalculateProgress(task.processId);
+    const updatedProcess = await recalculateProgress(t.processId, session);
+    await recordAudit(organizationId, user._id, 'TASK_STATUS_CHANGED', 'OnboardingTask', t._id, { from: prevStatus, to: status }, reqMeta, session);
 
-  await recordAudit(organizationId, user._id, 'TASK_STATUS_CHANGED', 'OnboardingTask', task._id, { from: previousStatus, to: status }, reqMeta);
+    return { task: t, process: updatedProcess, previousStatus: prevStatus };
+  });
+
   emitToOrg(
     organizationId,
     SOCKET_EVENTS.ONBOARDING_TASK_STATUS_CHANGED,
     { taskId: task._id.toString(), processId: task.processId.toString(), from: previousStatus, to: status }
   );
 
-  if (status === 'COMPLETED') {
-    const completedProcess = await OnboardingProcess.findById(task.processId);
-    if (completedProcess && completedProcess.status === 'COMPLETED') {
-      emitToOrg(organizationId, SOCKET_EVENTS.ONBOARDING_PROCESS_COMPLETED, {
-        processId: completedProcess._id.toString(), type: completedProcess.type,
-      });
-      await notifyHR(organizationId, 'PROCESS_COMPLETED', 'Process completed', `${completedProcess.title} is fully complete`, 'OnboardingProcess', completedProcess._id);
-    }
+  if (status === 'COMPLETED' && process && process.status === 'COMPLETED') {
+    emitToOrg(organizationId, SOCKET_EVENTS.ONBOARDING_PROCESS_COMPLETED, {
+      processId: process._id.toString(), type: process.type,
+    });
+    await notifyHR(organizationId, 'PROCESS_COMPLETED', 'Process completed', `${process.title} is fully complete`, 'OnboardingProcess', process._id);
   }
 
   return getProcessById(organizationId, task.processId, user);
 }
 
 async function deleteTask(organizationId, taskId, user, reqMeta = {}) {
-  const task = await OnboardingTask.findOne({ _id: taskId, organizationId: new Types.ObjectId(organizationId) });
-  if (!task) throw new AppError('Task not found', 404);
+  const processId = await withTransaction(async (session) => {
+    const opts = session ? { session } : undefined;
+    const task = await OnboardingTask.findOne({ _id: taskId, organizationId: new Types.ObjectId(organizationId) }, null, opts);
+    if (!task) throw new AppError('Task not found', 404);
 
-  const process = await OnboardingProcess.findById(task.processId);
-  if (process && ['COMPLETED', 'CANCELLED'].includes(process.status)) throw new AppError(`Cannot delete tasks in a ${process.status.toLowerCase()} process`, 400);
-  if (!onboardingAccess.FULL_ROLES.includes(user.role) && task.assigneeId && task.assigneeId.toString() !== user._id.toString()) {
-    throw new AppError('Forbidden: cannot delete this task', 403);
-  }
+    const process = await OnboardingProcess.findById(task.processId, null, opts);
+    if (process && ['COMPLETED', 'CANCELLED'].includes(process.status)) throw new AppError(`Cannot delete tasks in a ${process.status.toLowerCase()} process`, 400);
+    if (!onboardingAccess.FULL_ROLES.includes(user.role) && task.assigneeId && task.assigneeId.toString() !== user._id.toString()) {
+      throw new AppError('Forbidden: cannot delete this task', 403);
+    }
 
-  const processId = task.processId;
-  await task.deleteOne();
-  await recalculateProgress(processId);
-  await recordAudit(organizationId, user._id, 'TASK_DELETED', 'OnboardingTask', task._id, { processId: processId.toString() }, reqMeta);
+    const pid = task.processId;
+    await task.deleteOne(opts);
+    await recalculateProgress(pid, session);
+    await recordAudit(organizationId, user._id, 'TASK_DELETED', 'OnboardingTask', task._id, { processId: pid.toString() }, reqMeta, session);
+    return pid;
+  });
+
   return getProcessById(organizationId, processId, user);
 }
 

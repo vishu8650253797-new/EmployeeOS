@@ -1,10 +1,11 @@
 const { Types } = require('mongoose');
 const { OnboardingTemplate } = require('../models');
 const AppError = require('../utils/AppError');
+const { withTransaction } = require('../utils/withTransaction');
 const auditLogService = require('./auditLogService');
 
-function recordAudit(organizationId, userId, action, entityId, metadata = {}, reqMeta = {}) {
-  return auditLogService.recordAction({ organizationId, userId, action, entityType: 'OnboardingTemplate', entityId, metadata, ...reqMeta });
+function recordAudit(organizationId, userId, action, entityId, metadata = {}, reqMeta = {}, session) {
+  return auditLogService.recordAction({ organizationId, userId, action, entityType: 'OnboardingTemplate', entityId, metadata, session, ...reqMeta });
 }
 
 const DEFAULTS = { page: 1, limit: 50, sortBy: 'createdAt', sortOrder: 'desc' };
@@ -55,7 +56,7 @@ async function getTemplateById(organizationId, id) {
     .populate('createdBy', 'firstName lastName')
     .lean();
   if (!item) throw new AppError('Template not found', 404);
-  return { ...item, id: item._id.toString() };
+  return { ...item, id: item._id.toString(), taskCount: (item.tasks || []).length };
 }
 
 function normalizeTasks(tasks = []) {
@@ -71,43 +72,57 @@ function normalizeTasks(tasks = []) {
 }
 
 async function createTemplate(organizationId, payload, user, reqMeta = {}) {
-  const item = await OnboardingTemplate.create({
-    organizationId: new Types.ObjectId(organizationId),
-    name: payload.name,
-    description: payload.description || '',
-    type: payload.type,
-    departmentId: payload.departmentId || undefined,
-    tasks: normalizeTasks(payload.tasks),
-    status: payload.status || 'ACTIVE',
-    createdBy: user._id,
+  const item = await withTransaction(async (session) => {
+    const opts = session ? { session } : undefined;
+    const [created] = await OnboardingTemplate.create(
+      [{
+        organizationId: new Types.ObjectId(organizationId),
+        name: payload.name,
+        description: payload.description || '',
+        type: payload.type,
+        departmentId: payload.departmentId || undefined,
+        tasks: normalizeTasks(payload.tasks),
+        status: payload.status || 'ACTIVE',
+        createdBy: user._id,
+      }],
+      opts
+    );
+    await recordAudit(organizationId, user._id, 'TEMPLATE_CREATED', created._id, { type: created.type, taskCount: created.tasks.length }, reqMeta, session);
+    return created;
   });
-  await recordAudit(organizationId, user._id, 'TEMPLATE_CREATED', item._id, { type: item.type, taskCount: item.tasks.length }, reqMeta);
   return getTemplateById(organizationId, item._id);
 }
 
 async function updateTemplate(organizationId, id, payload, user, reqMeta = {}) {
-  const item = await OnboardingTemplate.findOne({ _id: id, organizationId: new Types.ObjectId(organizationId) });
-  if (!item) throw new AppError('Template not found', 404);
+  const item = await withTransaction(async (session) => {
+    const opts = session ? { session } : undefined;
+    const template = await OnboardingTemplate.findOne({ _id: id, organizationId: new Types.ObjectId(organizationId) }, null, opts);
+    if (!template) throw new AppError('Template not found', 404);
 
-  if (payload.name) item.name = payload.name;
-  if (payload.description !== undefined) item.description = payload.description;
-  if (payload.type && ['ONBOARDING', 'OFFBOARDING'].includes(payload.type)) item.type = payload.type;
-  if (payload.departmentId !== undefined) item.departmentId = payload.departmentId || undefined;
-  if (payload.tasks !== undefined) item.tasks = normalizeTasks(payload.tasks);
-  if (payload.status && ['ACTIVE', 'INACTIVE'].includes(payload.status)) item.status = payload.status;
+    if (payload.name) template.name = payload.name;
+    if (payload.description !== undefined) template.description = payload.description;
+    if (payload.type && ['ONBOARDING', 'OFFBOARDING'].includes(payload.type)) template.type = payload.type;
+    if (payload.departmentId !== undefined) template.departmentId = payload.departmentId || undefined;
+    if (payload.tasks !== undefined) template.tasks = normalizeTasks(payload.tasks);
+    if (payload.status && ['ACTIVE', 'INACTIVE'].includes(payload.status)) template.status = payload.status;
 
-  await item.save();
-  await recordAudit(organizationId, user._id, 'TEMPLATE_UPDATED', item._id, { changed: Object.keys(payload) }, reqMeta);
+    await template.save(opts);
+    await recordAudit(organizationId, user._id, 'TEMPLATE_UPDATED', template._id, { changed: Object.keys(payload) }, reqMeta, session);
+    return template;
+  });
   return getTemplateById(organizationId, item._id);
 }
 
 async function deleteTemplate(organizationId, id, user, reqMeta = {}) {
-  const item = await OnboardingTemplate.findOne({ _id: id, organizationId: new Types.ObjectId(organizationId) });
-  if (!item) throw new AppError('Template not found', 404);
-  const previousStatus = item.status;
-  item.status = 'INACTIVE';
-  await item.save();
-  await recordAudit(organizationId, user._id, 'TEMPLATE_DEACTIVATED', item._id, { previousStatus }, reqMeta);
+  await withTransaction(async (session) => {
+    const opts = session ? { session } : undefined;
+    const template = await OnboardingTemplate.findOne({ _id: id, organizationId: new Types.ObjectId(organizationId) }, null, opts);
+    if (!template) throw new AppError('Template not found', 404);
+    const previousStatus = template.status;
+    template.status = 'INACTIVE';
+    await template.save(opts);
+    await recordAudit(organizationId, user._id, 'TEMPLATE_DEACTIVATED', template._id, { previousStatus }, reqMeta, session);
+  });
   return { success: true, message: 'Template deactivated' };
 }
 
