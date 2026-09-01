@@ -20,6 +20,8 @@ const userSchema = new Schema(
     status: { type: String, enum: STATUSES, default: 'active' },
     lastLogin: { type: Date },
     refreshToken: { type: String, select: false },
+    resetPasswordToken: { type: String, select: false },
+    resetPasswordExpires: { type: Date, select: false },
   },
   { timestamps: true }
 );

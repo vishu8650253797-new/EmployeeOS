@@ -27,6 +27,12 @@ const recruitmentRoutes = require('./recruitmentRoutes');
 const publicJobRoutes = require('./publicJobRoutes');
 const onboardingTemplateRoutes = require('./onboardingTemplateRoutes');
 const onboardingRoutes = require('./onboardingRoutes');
+const assetCategoryRoutes = require('./assetCategoryRoutes');
+const assetVendorRoutes = require('./assetVendorRoutes');
+const assetRequestRoutes = require('./assetRequestRoutes');
+const assetMaintenanceRoutes = require('./assetMaintenanceRoutes');
+const assetAnalyticsRoutes = require('./assetAnalyticsRoutes');
+const assetRoutes = require('./assetRoutes');
 
 const router = Router();
 
@@ -62,5 +68,16 @@ router.use('/recruitment', recruitmentRoutes);
 router.use('/public', publicJobRoutes);
 router.use('/onboarding-templates', onboardingTemplateRoutes);
 router.use('/onboarding', onboardingRoutes);
+
+// Order matters: these literal sub-paths are registered before the generic
+// /assets router below, so they're matched first instead of falling through
+// to its /:id pattern (e.g. GET /assets/categories would otherwise be
+// captured as /assets/:id with id="categories").
+router.use('/assets/categories', assetCategoryRoutes);
+router.use('/assets/vendors', assetVendorRoutes);
+router.use('/assets/requests', assetRequestRoutes);
+router.use('/assets/maintenance', assetMaintenanceRoutes);
+router.use('/assets/analytics', assetAnalyticsRoutes);
+router.use('/assets', assetRoutes);
 
 module.exports = router;

@@ -25,6 +25,9 @@ import {
   Kanban,
   Calendar,
   Send,
+  Package,
+  Truck,
+  Wrench,
 } from 'lucide-react';
 
 // Sidebar navigation. Later, filter sections/items by role permissions.
@@ -63,6 +66,17 @@ export const NAV_SECTIONS = [
       { label: 'Documents', to: '/documents', icon: FolderOpen },
       { label: 'Payroll', to: '/payroll', icon: Wallet },
       { label: 'Reports', to: '/reports', icon: BarChart3 },
+    ],
+  },
+  {
+    title: 'Assets',
+    items: [
+      { label: 'Inventory', to: '/assets', icon: Package },
+      { label: 'Categories', to: '/assets/categories', icon: Layers },
+      { label: 'Vendors', to: '/assets/vendors', icon: Truck },
+      { label: 'Requests', to: '/assets/requests', icon: ClipboardList },
+      { label: 'Maintenance', to: '/assets/maintenance', icon: Wrench },
+      { label: 'Analytics', to: '/assets/analytics', icon: BarChart2 },
     ],
   },
   {

@@ -330,7 +330,7 @@ export default function CandidateDetail() {
                   rows={3}
                   placeholder="Add a note..."
                   value={noteContent}
-                  onChange={(e) => setNoteContent(e.target.value)}
+                  onChange={(v) => setNoteContent(v)}
                 />
                 <label className="flex items-center gap-2 text-sm">
                   <input

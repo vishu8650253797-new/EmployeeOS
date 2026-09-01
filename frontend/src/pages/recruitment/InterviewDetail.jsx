@@ -203,7 +203,7 @@ export default function InterviewDetail() {
                       min="1"
                       max="5"
                       value={feedbackForm.rating}
-                      onChange={(e) => setFeedbackForm({ ...feedbackForm, rating: Number(e.target.value) })}
+                      onChange={(v) => setFeedbackForm({ ...feedbackForm, rating: Number(v) })}
                     />
                   </div>
                   <Select
@@ -218,21 +218,21 @@ export default function InterviewDetail() {
                   textarea
                   rows={2}
                   value={feedbackForm.strengths}
-                  onChange={(e) => setFeedbackForm({ ...feedbackForm, strengths: e.target.value })}
+                  onChange={(v) => setFeedbackForm({ ...feedbackForm, strengths: v })}
                 />
                 <Input
                   label="Weaknesses"
                   textarea
                   rows={2}
                   value={feedbackForm.weaknesses}
-                  onChange={(e) => setFeedbackForm({ ...feedbackForm, weaknesses: e.target.value })}
+                  onChange={(v) => setFeedbackForm({ ...feedbackForm, weaknesses: v })}
                 />
                 <Input
                   label="Comments"
                   textarea
                   rows={3}
                   value={feedbackForm.comments}
-                  onChange={(e) => setFeedbackForm({ ...feedbackForm, comments: e.target.value })}
+                  onChange={(v) => setFeedbackForm({ ...feedbackForm, comments: v })}
                 />
                 <div className="flex gap-2">
                   <Button type="submit" size="sm">

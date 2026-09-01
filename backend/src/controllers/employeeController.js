@@ -1,4 +1,5 @@
 const employeeService = require('../services/employeeService');
+const assetService = require('../services/assetService');
 const auditLogService = require('../services/auditLogService');
 
 const reqMeta = (req) => auditLogService.requestMeta(req);
@@ -14,6 +15,11 @@ function streamFile(res, { stream, size, filename, mimeType }, disposition) {
 exports.getEmployees = async (req, res) => {
   const { employees, pagination } = await employeeService.getEmployees(req.organizationId, req.query);
   res.json({ success: true, data: employees, pagination });
+};
+
+exports.getEmployeeAssets = async (req, res) => {
+  const { data } = await assetService.getEmployeeAssets(req.organizationId, req.params.id, req.user);
+  res.json({ success: true, data });
 };
 
 exports.getEmployeeById = async (req, res) => {

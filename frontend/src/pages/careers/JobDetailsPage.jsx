@@ -20,7 +20,7 @@ export default function JobDetailsPage() {
     try {
       setLoading(true);
       setError(null);
-      const jobRes = await publicJobService.getPublicJobBySlug(slug);
+      const jobRes = await publicJobService.getJobBySlug(slug);
       setJob(jobRes);
     } catch (err) {
       setError(err.message);
@@ -66,7 +66,7 @@ export default function JobDetailsPage() {
             {job.salaryMin && (
               <div className="flex items-center gap-2 text-sm text-ink-600">
                 <DollarSign size={16} className="text-ink-400" />
-                <span>{job.salaryCurrency} {job.salaryMin} - {job.salaryMax} / {job.salaryPeriod}</span>
+                <span>{job.salaryCurrency} {job.salaryMin} - {job.salaryMax}</span>
               </div>
             )}
           </div>

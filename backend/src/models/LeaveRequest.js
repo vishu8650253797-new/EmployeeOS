@@ -7,7 +7,7 @@ const leaveRequestSchema = new Schema(
     leaveTypeId: { type: Schema.Types.ObjectId, ref: 'LeaveType', required: true },
     startDate: { type: Date, required: true },
     endDate: { type: Date, required: true },
-    numberOfDays: { type: Number, required: true, min: 1 },
+    numberOfDays: { type: Number, required: true, min: 0.5 },
     durationType: { type: String, enum: ['FULL_DAY', 'HALF_DAY'], default: 'FULL_DAY' },
     reason: { type: String, trim: true },
     status: { type: String, enum: ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'], default: 'PENDING' },

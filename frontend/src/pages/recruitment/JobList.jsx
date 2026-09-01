@@ -94,7 +94,7 @@ export default function JobList() {
             <Input
               placeholder="Search jobs..."
               value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
+              onChange={(v) => handleFilterChange('search', v)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               icon={<Search size={16} />}
             />

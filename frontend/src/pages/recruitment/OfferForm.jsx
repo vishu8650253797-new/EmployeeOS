@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { offerService } from '../../services/offerService';
-import { candidateService } from '../../services/candidateService';
-import { recruitmentJobService } from '../../services/recruitmentJobService';
+import { applicationService } from '../../services/applicationService';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import PageHeader from '../../components/layout/PageHeader';
 import Button from '../../components/ui/Button';
@@ -12,10 +10,9 @@ import Select from '../../components/ui/Select';
 import { LoadingState, ErrorState } from '../../components/ui/States';
 
 const EMPLOYMENT_TYPES = ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERNSHIP', 'TEMPORARY', 'FREELANCE'];
-const SALARY_PERIODS = ['YEARLY', 'MONTHLY', 'HOURLY'];
+const CLOSED_STATUSES = ['REJECTED', 'WITHDRAWN', 'HIRED'];
 
 export default function OfferForm() {
-  const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const { id } = useParams();
@@ -24,53 +21,53 @@ export default function OfferForm() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
-  const [candidates, setCandidates] = useState([]);
-  const [jobs, setJobs] = useState([]);
+  const [applications, setApplications] = useState([]);
+  const [offerCandidateName, setOfferCandidateName] = useState('');
+  const [offerJobTitle, setOfferJobTitle] = useState('');
   const [formData, setFormData] = useState({
-    candidateId: searchParams.get('candidateId') || '',
-    jobId: '',
-    salaryMin: '',
-    salaryMax: '',
-    salaryCurrency: 'USD',
-    salaryPeriod: 'YEARLY',
+    applicationId: '',
+    salary: '',
+    currency: 'USD',
     employmentType: 'FULL_TIME',
     startDate: '',
-    expiryDate: '',
+    offerExpiryDate: '',
     benefits: '',
     notes: '',
   });
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
-      const [candidatesRes, jobsRes] = await Promise.all([
-        candidateService.getCandidates({}),
-        recruitmentJobService.getJobs({}),
-      ]);
-      setCandidates(candidatesRes.data || []);
-      setJobs(jobsRes.data || []);
 
       if (isEdit) {
-        const offerRes = await offerService.getOffer(id);
-        const offer = offerRes;
+        const offer = await offerService.getOffer(id);
+        setOfferCandidateName(offer.candidateId ? `${offer.candidateId.firstName} ${offer.candidateId.lastName}` : '');
+        setOfferJobTitle(offer.jobId?.title || '');
         setFormData({
-          candidateId: offer.candidateId?.id || '',
-          jobId: offer.jobId?.id || '',
-          salaryMin: offer.salaryMin || '',
-          salaryMax: offer.salaryMax || '',
-          salaryCurrency: offer.salaryCurrency || 'USD',
-          salaryPeriod: offer.salaryPeriod || 'YEARLY',
+          applicationId: offer.applicationId?._id || offer.applicationId || '',
+          salary: offer.salary ?? '',
+          currency: offer.currency || 'USD',
           employmentType: offer.employmentType || 'FULL_TIME',
           startDate: offer.startDate ? offer.startDate.split('T')[0] : '',
-          expiryDate: offer.expiryDate ? offer.expiryDate.split('T')[0] : '',
+          offerExpiryDate: offer.offerExpiryDate ? offer.offerExpiryDate.split('T')[0] : '',
           benefits: (offer.benefits || []).join('\n'),
           notes: offer.notes || '',
         });
+      } else {
+        const candidateId = searchParams.get('candidateId') || '';
+        const appsRes = await applicationService.getApplications({
+          candidate: candidateId || undefined,
+          limit: 200,
+        });
+        const openApps = (appsRes.data || []).filter((a) => !CLOSED_STATUSES.includes(a.status));
+        setApplications(openApps);
+        setFormData((f) => ({ ...f, applicationId: openApps.length === 1 ? openApps[0].id : '' }));
       }
     } catch (err) {
       setError(err.message);
@@ -81,18 +78,26 @@ export default function OfferForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!isEdit && !formData.applicationId) {
+      toast.error('Select an application to make an offer for');
+      return;
+    }
+    if (formData.salary === '' || Number(formData.salary) < 0) {
+      toast.error('Enter a valid salary');
+      return;
+    }
     try {
       setSubmitting(true);
       const payload = {
         ...formData,
-        salaryMin: formData.salaryMin ? Number(formData.salaryMin) : undefined,
-        salaryMax: formData.salaryMax ? Number(formData.salaryMax) : undefined,
+        salary: Number(formData.salary),
         benefits: formData.benefits.split('\n').filter(Boolean),
         startDate: formData.startDate || undefined,
-        expiryDate: formData.expiryDate || undefined,
+        offerExpiryDate: formData.offerExpiryDate || undefined,
       };
 
       if (isEdit) {
+        delete payload.applicationId; // not editable after creation
         await offerService.updateOffer(id, payload);
         toast.success('Offer updated successfully');
       } else {
@@ -114,7 +119,7 @@ export default function OfferForm() {
     <div>
       <PageHeader
         title={isEdit ? 'Edit Offer' : 'Create Offer'}
-        subtitle={isEdit ? 'Update offer details' : 'Create a new job offer'}
+        subtitle={isEdit ? 'Update offer details' : 'Create a new job offer for an application'}
         actions={
           <Button variant="secondary" onClick={() => navigate('/recruitment/offers')}>
             Cancel
@@ -126,40 +131,33 @@ export default function OfferForm() {
         <div className="rounded-xl border border-line bg-surface p-5">
           <h3 className="mb-4 text-sm font-semibold text-ink-900">Offer Details</h3>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Select
-              label="Candidate"
-              value={formData.candidateId}
-              onChange={(v) => setFormData({ ...formData, candidateId: v })}
-              options={candidates.map((c) => ({ value: c.id, label: `${c.firstName} ${c.lastName} - ${c.email}` }))}
-            />
-            <Select
-              label="Job"
-              value={formData.jobId}
-              onChange={(v) => setFormData({ ...formData, jobId: v })}
-              options={jobs.map((j) => ({ value: j.id, label: j.title }))}
-            />
+            {isEdit ? (
+              <Input label="Candidate & Job" value={`${offerCandidateName} — ${offerJobTitle}`} disabled className="sm:col-span-2" />
+            ) : (
+              <Select
+                label="Application"
+                required
+                value={formData.applicationId}
+                onChange={(v) => setFormData({ ...formData, applicationId: v })}
+                options={applications.map((a) => ({
+                  value: a.id,
+                  label: `${a.candidateId?.firstName} ${a.candidateId?.lastName} — ${a.jobId?.title}`,
+                }))}
+                placeholder="Select an application"
+                className="sm:col-span-2"
+              />
+            )}
             <Input
-              label="Salary Min"
+              label="Salary"
               type="number"
-              value={formData.salaryMin}
-              onChange={(e) => setFormData({ ...formData, salaryMin: e.target.value })}
-            />
-            <Input
-              label="Salary Max"
-              type="number"
-              value={formData.salaryMax}
-              onChange={(e) => setFormData({ ...formData, salaryMax: e.target.value })}
+              required
+              value={formData.salary}
+              onChange={(v) => setFormData({ ...formData, salary: v })}
             />
             <Input
               label="Currency"
-              value={formData.salaryCurrency}
-              onChange={(e) => setFormData({ ...formData, salaryCurrency: e.target.value })}
-            />
-            <Select
-              label="Salary Period"
-              value={formData.salaryPeriod}
-              onChange={(v) => setFormData({ ...formData, salaryPeriod: v })}
-              options={SALARY_PERIODS}
+              value={formData.currency}
+              onChange={(v) => setFormData({ ...formData, currency: v })}
             />
             <Select
               label="Employment Type"
@@ -171,13 +169,14 @@ export default function OfferForm() {
               label="Start Date"
               type="date"
               value={formData.startDate}
-              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+              onChange={(v) => setFormData({ ...formData, startDate: v })}
             />
             <Input
-              label="Expiry Date"
+              label="Offer Expiry Date"
               type="date"
-              value={formData.expiryDate}
-              onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
+              value={formData.offerExpiryDate}
+              onChange={(v) => setFormData({ ...formData, offerExpiryDate: v })}
+              hint="Defaults to 14 days from now if left blank"
             />
           </div>
         </div>
@@ -190,7 +189,7 @@ export default function OfferForm() {
               textarea
               rows={4}
               value={formData.benefits}
-              onChange={(e) => setFormData({ ...formData, benefits: e.target.value })}
+              onChange={(v) => setFormData({ ...formData, benefits: v })}
               placeholder="e.g., Health insurance, 401(k), Remote work"
             />
             <Input
@@ -198,7 +197,7 @@ export default function OfferForm() {
               textarea
               rows={3}
               value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              onChange={(v) => setFormData({ ...formData, notes: v })}
             />
           </div>
         </div>

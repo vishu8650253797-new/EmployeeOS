@@ -116,6 +116,9 @@ async function createInterview(organizationId, payload, actor, reqMeta = {}) {
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) throw new AppError('Invalid date', 400);
   if (start >= end) throw new AppError('Start time must be before end time', 400);
   if (!interviewerIds?.length) throw new AppError('At least one interviewer is required', 400);
+  if (interviewerIds.some((id) => !Types.ObjectId.isValid(id))) {
+    throw new AppError('Interviewers must be selected from existing users, not free text', 400);
+  }
 
   const application = await JobApplication.findOne({ _id: applicationId, organizationId: orgId })
     .populate('candidateId', 'firstName lastName')
@@ -183,6 +186,9 @@ async function updateInterview(organizationId, id, payload, actor, reqMeta = {})
     if (payload[f] !== undefined) interview[f] = payload[f];
   });
   if (payload.interviewerIds !== undefined && payload.interviewerIds.length) {
+    if (payload.interviewerIds.some((interviewerId) => !Types.ObjectId.isValid(interviewerId))) {
+      throw new AppError('Interviewers must be selected from existing users, not free text', 400);
+    }
     interview.interviewerIds = payload.interviewerIds;
   }
   await interview.save();

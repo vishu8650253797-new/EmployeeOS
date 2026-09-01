@@ -49,6 +49,9 @@ router.delete(
   asyncHandler(employeeController.deleteEmployee)
 );
 
+// Self-or-elevated access is enforced inside assetService, not by role gate here.
+router.get('/:id/assets', authMiddleware, getById, asyncHandler(employeeController.getEmployeeAssets));
+
 // Pre-boarding: self-or-HR access is enforced inside employeeService, not by role gate here.
 router.get('/:id/bank-details', authMiddleware, getById, asyncHandler(employeeController.getBankDetails));
 router.put('/:id/bank-details', authMiddleware, updateBankDetails, asyncHandler(employeeController.updateBankDetails));

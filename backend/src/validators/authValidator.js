@@ -20,4 +20,19 @@ const loginValidator = [
   body('password').notEmpty().withMessage('Password is required'),
 ];
 
-module.exports = { registerValidator, loginValidator };
+const forgotPasswordValidator = [
+  body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
+];
+
+const resetPasswordValidator = [
+  body('token').trim().notEmpty().withMessage('Reset token is required'),
+  body('password')
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters long')
+    .matches(/\d/)
+    .withMessage('Password must contain at least one number')
+    .matches(/[a-zA-Z]/)
+    .withMessage('Password must contain at least one letter'),
+];
+
+module.exports = { registerValidator, loginValidator, forgotPasswordValidator, resetPasswordValidator };

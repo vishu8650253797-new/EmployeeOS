@@ -25,8 +25,8 @@ export default function CareersPage() {
     try {
       setLoading(true);
       setError(null);
-      const jobsRes = await publicJobService.getPublicJobs(filters);
-      setJobs(jobsRes || []);
+      const jobsRes = await publicJobService.getJobs(filters);
+      setJobs(jobsRes.data || []);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -57,7 +57,7 @@ export default function CareersPage() {
               <Input
                 placeholder="Search jobs..."
                 value={filters.search}
-                onChange={(e) => handleFilterChange('search', e.target.value)}
+                onChange={(v) => handleFilterChange('search', v)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                 icon={<Search size={16} />}
               />
@@ -105,7 +105,7 @@ export default function CareersPage() {
                 </div>
                 {job.salaryMin && (
                   <div className="mt-4 text-sm font-medium text-ink-900">
-                    {job.salaryCurrency} {job.salaryMin} - {job.salaryMax} / {job.salaryPeriod}
+                    {job.salaryCurrency} {job.salaryMin} - {job.salaryMax}
                   </div>
                 )}
                 <Button className="mt-4 w-full">View Details</Button>

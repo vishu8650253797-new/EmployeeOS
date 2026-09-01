@@ -107,6 +107,43 @@ async function getCandidateById(organizationId, id) {
   };
 }
 
+async function createCandidate(organizationId, payload, actor, reqMeta = {}) {
+  const orgId = new Types.ObjectId(organizationId);
+  const email = String(payload.email || '').trim().toLowerCase();
+  if (!payload.firstName?.trim()) throw new AppError('First name is required', 400);
+  if (!payload.lastName?.trim()) throw new AppError('Last name is required', 400);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new AppError('A valid email is required', 400);
+
+  const existing = await Candidate.findOne({ organizationId: orgId, email });
+  if (existing) throw new AppError('A candidate with this email already exists', 409);
+
+  const candidate = await Candidate.create({
+    organizationId: orgId,
+    firstName: payload.firstName.trim(),
+    lastName: payload.lastName.trim(),
+    email,
+    phone: payload.phone,
+    location: payload.location,
+    currentCompany: payload.currentCompany,
+    currentJobTitle: payload.currentJobTitle,
+    yearsOfExperience: payload.yearsOfExperience !== undefined && payload.yearsOfExperience !== '' ? Number(payload.yearsOfExperience) : undefined,
+    skills: typeof payload.skills === 'string'
+      ? payload.skills.split(',').map((s) => s.trim()).filter(Boolean)
+      : (payload.skills || []),
+    linkedinUrl: payload.linkedinUrl,
+    portfolioUrl: payload.portfolioUrl,
+    githubUrl: payload.githubUrl,
+    source: payload.source,
+  });
+
+  await auditLogService.recordAction({
+    organizationId, userId: actor._id, action: 'CANDIDATE_CREATED', entityType: 'Candidate', entityId: candidate._id,
+    metadata: { email: candidate.email }, ...reqMeta,
+  });
+  emitToOrg(organizationId, SOCKET_EVENTS.CANDIDATE_CREATED, candidate.toJSON());
+  return candidate.toJSON();
+}
+
 async function updateCandidate(organizationId, id, payload, actor, reqMeta = {}) {
   const candidate = await Candidate.findOne({ _id: id, organizationId: new Types.ObjectId(organizationId) });
   if (!candidate) throw new AppError('Candidate not found', 404);
@@ -352,6 +389,7 @@ async function convertToEmployee(organizationId, candidateId, payload, actor, re
 module.exports = {
   getCandidates,
   getCandidateById,
+  createCandidate,
   updateCandidate,
   updateTags,
   assignRecruiter,

@@ -97,7 +97,7 @@ export default function InterviewList() {
             <Input
               placeholder="Search interviews..."
               value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
+              onChange={(v) => handleFilterChange('search', v)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               icon={<Search size={16} />}
             />

@@ -108,7 +108,7 @@ export default function OfferDetail() {
               <div className="flex items-center gap-2 text-sm">
                 <DollarSign size={16} className="text-ink-400" />
                 <span className="text-ink-700">
-                  {offer.salaryCurrency} {offer.salaryMin} - {offer.salaryMax} / {offer.salaryPeriod}
+                  {offer.currency} {offer.salary}
                 </span>
               </div>
               <div className="flex items-center gap-2 text-sm">

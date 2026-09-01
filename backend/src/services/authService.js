@@ -1,6 +1,14 @@
+const crypto = require('crypto');
 const { Organization, User } = require('../models');
 const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/generateTokens');
 const { AppError } = require('../middleware/errorMiddleware');
+const emailService = require('./emailService');
+
+const RESET_TOKEN_TTL_MS = 30 * 60 * 1000; // 30 minutes, matches the frontend's messaging
+
+function hashToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
 
 function sanitizeUser(user) {
   const obj = user.toObject ? user.toObject() : user;
@@ -105,4 +113,38 @@ async function getCurrentUser(userId) {
   return sanitizeUser(user);
 }
 
-module.exports = { register, login, refresh, logout, getCurrentUser, sanitizeUser };
+// Never reveals whether an email is registered — always resolves the same way
+// so the endpoint can't be used to enumerate accounts.
+async function forgotPassword(email, clientUrl) {
+  const normalizedEmail = (email || '').trim().toLowerCase();
+  const user = await User.findOne({ email: normalizedEmail });
+  if (user && user.status === 'active') {
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    user.resetPasswordToken = hashToken(rawToken);
+    user.resetPasswordExpires = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+    await user.save();
+
+    const resetUrl = `${clientUrl || process.env.CLIENT_URL || 'http://localhost:5173'}/reset-password?token=${rawToken}`;
+    await emailService.sendPasswordResetEmail({ to: user.email, firstName: user.firstName, resetUrl });
+  }
+  return { success: true };
+}
+
+async function resetPassword(token, newPassword) {
+  if (!token) throw new AppError('Reset token is required', 400);
+  const user = await User.findOne({
+    resetPasswordToken: hashToken(token),
+    resetPasswordExpires: { $gt: new Date() },
+  }).select('+password +resetPasswordToken +resetPasswordExpires');
+  if (!user) throw new AppError('This reset link is invalid or has expired', 400);
+
+  user.password = newPassword;
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpires = undefined;
+  user.refreshToken = null; // invalidate existing sessions
+  await user.save();
+
+  return { success: true };
+}
+
+module.exports = { register, login, refresh, logout, getCurrentUser, forgotPassword, resetPassword, sanitizeUser };

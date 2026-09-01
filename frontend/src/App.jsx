@@ -48,6 +48,17 @@ const EmployeeDocumentDashboard = lazy(() => import('./pages/documents/EmployeeD
 const HRDocumentDashboard = lazy(() => import('./pages/documents/HRDocumentDashboard'));
 const DocumentAnalytics = lazy(() => import('./pages/documents/DocumentAnalytics'));
 
+// Asset management pages
+const AssetInventory = lazy(() => import('./pages/assets/AssetInventory'));
+const AssetForm = lazy(() => import('./pages/assets/AssetForm'));
+const AssetDetails = lazy(() => import('./pages/assets/AssetDetails'));
+const AssetCategories = lazy(() => import('./pages/assets/AssetCategories'));
+const AssetVendors = lazy(() => import('./pages/assets/AssetVendors'));
+const AssetVendorDetails = lazy(() => import('./pages/assets/AssetVendorDetails'));
+const AssetRequests = lazy(() => import('./pages/assets/AssetRequests'));
+const AssetMaintenance = lazy(() => import('./pages/assets/AssetMaintenance'));
+const AssetAnalytics = lazy(() => import('./pages/assets/AssetAnalytics'));
+
 // Recruitment pages
 const RecruitmentDashboard = lazy(() => import('./pages/recruitment/RecruitmentDashboard'));
 const JobList = lazy(() => import('./pages/recruitment/JobList'));
@@ -144,6 +155,17 @@ export default function App() {
                   <Route path="/my-documents" element={<EmployeeDocumentDashboard />} />
                   <Route path="/hr/documents" element={<HRDocumentDashboard />} />
                   <Route path="/documents/analytics" element={<DocumentAnalytics />} />
+
+                  <Route path="/assets" element={<AssetInventory />} />
+                  <Route path="/assets/new" element={<AssetForm />} />
+                  <Route path="/assets/categories" element={<AssetCategories />} />
+                  <Route path="/assets/vendors" element={<AssetVendors />} />
+                  <Route path="/assets/vendors/:id" element={<AssetVendorDetails />} />
+                  <Route path="/assets/requests" element={<AssetRequests />} />
+                  <Route path="/assets/maintenance" element={<AssetMaintenance />} />
+                  <Route path="/assets/analytics" element={<AssetAnalytics />} />
+                  <Route path="/assets/:id" element={<AssetDetails />} />
+                  <Route path="/assets/:id/edit" element={<AssetForm />} />
 
                   <Route path="/recruitment" element={<RecruitmentDashboard />} />
                   <Route path="/recruitment/jobs" element={<JobList />} />

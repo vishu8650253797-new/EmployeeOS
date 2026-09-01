@@ -22,7 +22,7 @@ export default function OfferResponsePage() {
     try {
       setLoading(true);
       setError(null);
-      const offerRes = await publicJobService.getPublicOffer(token);
+      const offerRes = await publicJobService.getOffer(token);
       setOffer(offerRes);
     } catch (err) {
       setError(err.message);
@@ -35,7 +35,11 @@ export default function OfferResponsePage() {
     try {
       setSubmitting(true);
       setError(null);
-      await publicJobService.respondToOffer(token, { decision, comments: response?.comments || '' });
+      if (decision === 'ACCEPTED') {
+        await publicJobService.acceptOffer(token);
+      } else {
+        await publicJobService.rejectOffer(token);
+      }
       setResponse({ ...response, submitted: true, decision });
     } catch (err) {
       setError(err.message);
@@ -99,7 +103,7 @@ export default function OfferResponsePage() {
             <div className="flex items-center gap-2 text-sm text-ink-600">
               <DollarSign size={16} className="text-ink-400" />
               <span>
-                {offer.salaryCurrency} {offer.salaryMin} - {offer.salaryMax} / {offer.salaryPeriod}
+                {offer.currency} {offer.salary}
               </span>
             </div>
             <div className="flex items-center gap-2 text-sm text-ink-600">

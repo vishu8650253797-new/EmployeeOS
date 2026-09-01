@@ -32,6 +32,7 @@ router.put('/jobs/:id/reopen', authorize(...RECRUITMENT_ADMIN), asyncHandler(job
 
 // ---- Candidates ----
 router.get('/candidates', authorize(...RECRUITMENT_VIEW), asyncHandler(candidateController.getCandidates));
+router.post('/candidates', authorize(...RECRUITMENT_MANAGE), asyncHandler(candidateController.createCandidate));
 router.get('/candidates/:id', authorize(...RECRUITMENT_VIEW), asyncHandler(candidateController.getCandidateById));
 router.put('/candidates/:id', authorize(...RECRUITMENT_MANAGE), asyncHandler(candidateController.updateCandidate));
 router.put('/candidates/:id/tags', authorize(...RECRUITMENT_MANAGE), asyncHandler(candidateController.updateTags));

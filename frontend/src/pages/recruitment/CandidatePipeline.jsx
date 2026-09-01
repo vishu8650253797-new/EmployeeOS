@@ -94,7 +94,7 @@ export default function CandidatePipeline() {
         <Input
           placeholder="Search candidates..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(v) => setSearch(v)}
           icon={<Search size={16} />}
         />
       </div>

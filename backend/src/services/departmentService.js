@@ -96,7 +96,10 @@ async function updateDepartment(organizationId, id, payload) {
   const updates = { ...payload, organizationId: new Types.ObjectId(organizationId) };
   delete updates._id;
   delete updates.id;
-  if (updates.headId) updates.headId = new Types.ObjectId(updates.headId);
+  // Distinguish "field omitted" (leave headId untouched) from "field sent
+  // empty" (explicitly clear it) — both arrive as falsy, but only the latter
+  // should null out the existing head.
+  if ('headId' in updates) updates.headId = updates.headId ? new Types.ObjectId(updates.headId) : null;
 
   Object.assign(existing, updates);
   await existing.save();

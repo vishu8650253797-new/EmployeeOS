@@ -194,19 +194,19 @@ export default function InterviewForm() {
               min="15"
               step="15"
               value={formData.duration}
-              onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+              onChange={(v) => setFormData({ ...formData, duration: v })}
             />
             <Input
               label="Date & Time"
               type="datetime-local"
               required
               value={formData.scheduledDate}
-              onChange={(e) => setFormData({ ...formData, scheduledDate: e.target.value })}
+              onChange={(v) => setFormData({ ...formData, scheduledDate: v })}
             />
             <Input
               label="Location / Meeting Link"
               value={formData.location}
-              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+              onChange={(v) => setFormData({ ...formData, location: v })}
               placeholder="e.g., https://zoom.us/j/..."
             />
           </div>
@@ -216,7 +216,7 @@ export default function InterviewForm() {
               textarea
               rows={3}
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(v) => setFormData({ ...formData, description: v })}
             />
           </div>
         </div>
@@ -227,7 +227,7 @@ export default function InterviewForm() {
           <Input
             label="Interviewer IDs"
             value={formData.interviewerIds.join(', ')}
-            onChange={(e) => setFormData({ ...formData, interviewerIds: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })}
+            onChange={(v) => setFormData({ ...formData, interviewerIds: v.split(',').map((s) => s.trim()).filter(Boolean) })}
             placeholder="e.g., user1, user2, user3"
           />
         </div>

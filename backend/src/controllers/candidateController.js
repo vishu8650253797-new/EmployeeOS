@@ -11,6 +11,11 @@ exports.getCandidateById = async (req, res) => {
   res.json({ success: true, data });
 };
 
+exports.createCandidate = async (req, res) => {
+  const data = await candidateService.createCandidate(req.organizationId, req.body, req.user, requestMeta(req));
+  res.status(201).json({ success: true, message: 'Candidate created', data });
+};
+
 exports.updateCandidate = async (req, res) => {
   const data = await candidateService.updateCandidate(req.organizationId, req.params.id, req.body, req.user, requestMeta(req));
   res.json({ success: true, message: 'Candidate updated', data });

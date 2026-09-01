@@ -11,6 +11,11 @@ export const candidateService = {
     return response.data.data;
   },
 
+  createCandidate: async (data) => {
+    const response = await api.post('/recruitment/candidates', data);
+    return response.data.data;
+  },
+
   updateCandidate: async (id, data) => {
     const response = await api.put(`/recruitment/candidates/${id}`, data);
     return response.data.data;

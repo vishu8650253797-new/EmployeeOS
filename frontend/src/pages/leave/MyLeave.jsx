@@ -4,6 +4,7 @@ import { leaveRequestService } from '../../services/leaveRequestService';
 import { leaveBalanceService } from '../../services/leaveBalanceService';
 import { useFetch } from '../../hooks/useFetch';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import { useSocketEvent } from '../../hooks/useSocket';
 import { SOCKET_EVENTS } from '../../utils/socketEvents';
 import { formatDate } from '../../utils/format';
@@ -29,6 +30,7 @@ import {
 } from '../../components/ui/Table';
 
 export default function MyLeave() {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [formOpen, setFormOpen] = useState(false);
@@ -298,7 +300,12 @@ export default function MyLeave() {
         confirmLabel="Cancel request"
       />
 
-      <LeaveRequestForm open={formOpen} onClose={() => setFormOpen(false)} onSuccess={refreshAll} />
+      <LeaveRequestForm
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        onSuccess={refreshAll}
+        employeeId={user?.employeeId}
+      />
     </div>
   );
 }

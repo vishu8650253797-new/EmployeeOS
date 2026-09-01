@@ -128,3 +128,24 @@ exports.me = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.forgotPassword = async (req, res, next) => {
+  try {
+    handleValidationErrors(req);
+    const clientUrl = req.headers.origin;
+    await authService.forgotPassword(req.body.email, clientUrl);
+    res.json({ success: true, message: 'If that email is registered, a reset link has been sent.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.resetPassword = async (req, res, next) => {
+  try {
+    handleValidationErrors(req);
+    await authService.resetPassword(req.body.token, req.body.password);
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (err) {
+    next(err);
+  }
+};

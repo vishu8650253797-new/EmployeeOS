@@ -62,6 +62,11 @@ async function sendDocumentRequestEmail(data) {
   return sendMail({ to: data.to, subject, html, text });
 }
 
+async function sendPasswordResetEmail(data) {
+  const { subject, html, text } = templates.passwordResetEmail(data);
+  return sendMail({ to: data.to, subject, html, text });
+}
+
 module.exports = {
   isConfigured,
   sendMail,
@@ -70,4 +75,5 @@ module.exports = {
   sendOfferResponseConfirmationEmail,
   sendJoiningDateConfirmedEmail,
   sendDocumentRequestEmail,
+  sendPasswordResetEmail,
 };

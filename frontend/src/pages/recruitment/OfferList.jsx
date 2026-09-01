@@ -97,7 +97,7 @@ export default function OfferList() {
             <Input
               placeholder="Search offers..."
               value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
+              onChange={(v) => handleFilterChange('search', v)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               icon={<Search size={16} />}
             />
@@ -142,7 +142,7 @@ export default function OfferList() {
                   </td>
                   <td className="px-4 py-3 text-ink-700">{offer.jobId?.title || '-'}</td>
                   <td className="px-4 py-3 text-ink-700">
-                    {offer.salaryCurrency} {offer.salaryMin} - {offer.salaryMax}
+                    {offer.currency} {offer.salary}
                   </td>
                   <td className="px-4 py-3 text-ink-700">
                     {offer.startDate ? new Date(offer.startDate).toLocaleDateString() : '-'}

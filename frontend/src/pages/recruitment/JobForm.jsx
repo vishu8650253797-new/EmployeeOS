@@ -136,15 +136,15 @@ export default function JobForm() {
         <div className="rounded-xl border border-line bg-surface p-5">
           <h3 className="mb-4 text-sm font-semibold text-ink-900">Basic Information</h3>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Input label="Job Title" required value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} />
+            <Input label="Job Title" required value={formData.title} onChange={(v) => setFormData({ ...formData, title: v })} />
             <Select
               label="Department"
               value={formData.departmentId}
               onChange={(v) => setFormData({ ...formData, departmentId: v })}
               options={departments.map((d) => ({ value: d.id, label: d.name }))}
             />
-            <Input label="Location" value={formData.location} onChange={(e) => setFormData({ ...formData, location: e.target.value })} />
-            <Input label="Number of Openings" type="number" min="1" value={formData.numberOfOpenings} onChange={(e) => setFormData({ ...formData, numberOfOpenings: e.target.value })} />
+            <Input label="Location" value={formData.location} onChange={(v) => setFormData({ ...formData, location: v })} />
+            <Input label="Number of Openings" type="number" min="1" value={formData.numberOfOpenings} onChange={(v) => setFormData({ ...formData, numberOfOpenings: v })} />
           </div>
         </div>
 
@@ -171,24 +171,24 @@ export default function JobForm() {
             />
           </div>
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Input label="Salary Min" type="number" value={formData.salaryMin} onChange={(e) => setFormData({ ...formData, salaryMin: e.target.value })} />
-            <Input label="Salary Max" type="number" value={formData.salaryMax} onChange={(e) => setFormData({ ...formData, salaryMax: e.target.value })} />
-            <Input label="Currency" value={formData.salaryCurrency} onChange={(e) => setFormData({ ...formData, salaryCurrency: e.target.value })} />
+            <Input label="Salary Min" type="number" value={formData.salaryMin} onChange={(v) => setFormData({ ...formData, salaryMin: v })} />
+            <Input label="Salary Max" type="number" value={formData.salaryMax} onChange={(v) => setFormData({ ...formData, salaryMax: v })} />
+            <Input label="Currency" value={formData.salaryCurrency} onChange={(v) => setFormData({ ...formData, salaryCurrency: v })} />
           </div>
           <div className="mt-4">
-            <Input label="Closing Date" type="date" value={formData.closingDate} onChange={(e) => setFormData({ ...formData, closingDate: e.target.value })} />
+            <Input label="Closing Date" type="date" value={formData.closingDate} onChange={(v) => setFormData({ ...formData, closingDate: v })} />
           </div>
         </div>
 
         <div className="rounded-xl border border-line bg-surface p-5">
           <h3 className="mb-4 text-sm font-semibold text-ink-900">Description</h3>
           <div className="space-y-4">
-            <Input label="Description" textarea rows={4} value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
-            <Input label="Responsibilities (one per line)" textarea rows={3} value={formData.responsibilities} onChange={(e) => setFormData({ ...formData, responsibilities: e.target.value })} />
-            <Input label="Requirements (one per line)" textarea rows={3} value={formData.requirements} onChange={(e) => setFormData({ ...formData, requirements: e.target.value })} />
-            <Input label="Qualifications (one per line)" textarea rows={3} value={formData.qualifications} onChange={(e) => setFormData({ ...formData, qualifications: e.target.value })} />
-            <Input label="Skills (comma-separated)" value={formData.skills} onChange={(e) => setFormData({ ...formData, skills: e.target.value })} />
-            <Input label="Benefits (one per line)" textarea rows={3} value={formData.benefits} onChange={(e) => setFormData({ ...formData, benefits: e.target.value })} />
+            <Input label="Description" textarea rows={4} value={formData.description} onChange={(v) => setFormData({ ...formData, description: v })} />
+            <Input label="Responsibilities (one per line)" textarea rows={3} value={formData.responsibilities} onChange={(v) => setFormData({ ...formData, responsibilities: v })} />
+            <Input label="Requirements (one per line)" textarea rows={3} value={formData.requirements} onChange={(v) => setFormData({ ...formData, requirements: v })} />
+            <Input label="Qualifications (one per line)" textarea rows={3} value={formData.qualifications} onChange={(v) => setFormData({ ...formData, qualifications: v })} />
+            <Input label="Skills (comma-separated)" value={formData.skills} onChange={(v) => setFormData({ ...formData, skills: v })} />
+            <Input label="Benefits (one per line)" textarea rows={3} value={formData.benefits} onChange={(v) => setFormData({ ...formData, benefits: v })} />
           </div>
         </div>
 

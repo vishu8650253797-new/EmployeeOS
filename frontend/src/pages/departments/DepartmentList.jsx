@@ -85,7 +85,9 @@ export default function DepartmentList() {
     event.preventDefault();
     if (!validate()) return;
     setSaving(true);
-    const payload = { ...form, headId: form.headId || undefined };
+    // Send headId as-is (including '') so clearing the head in edit mode is
+    // distinguishable from not touching the field at all — see departmentService.js.
+    const payload = { ...form };
     try {
       if (editing) {
         await departmentService.updateDepartment(editing.id, payload);

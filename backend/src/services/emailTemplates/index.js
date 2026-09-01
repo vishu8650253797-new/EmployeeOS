@@ -4,4 +4,5 @@ module.exports = {
   offerResponseEmail: require('./offerResponse'),
   joiningDateConfirmedEmail: require('./joiningDateConfirmed'),
   documentRequestEmail: require('./documentRequest'),
+  passwordResetEmail: require('./passwordReset'),
 };

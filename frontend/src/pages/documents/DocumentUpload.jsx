@@ -1,16 +1,24 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Upload, X, FileText, AlertCircle } from 'lucide-react';
 import { documentService } from '../../services/documentService';
+import { documentRequestService } from '../../services/documentRequestService';
 import { documentCategoryService } from '../../services/documentCategoryService';
 import { employeeService } from '../../services/employeeService';
+import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import { useToast } from '../../context/ToastContext';
 
+const EMPLOYEE_PICKER_ROLES = ['SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'];
+
 export default function DocumentUpload() {
   const navigate = useNavigate();
+  const { id: requestId } = useParams();
+  const isRequestUpload = Boolean(requestId);
+  const { user } = useAuth();
   const { toast } = useToast();
+  const canPickEmployee = EMPLOYEE_PICKER_ROLES.includes(user?.role);
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -23,9 +31,13 @@ export default function DocumentUpload() {
   });
 
   useEffect(() => {
+    // A request-fulfillment upload derives the employee/category from the
+    // request itself server-side — no need for these pickers on that path.
+    if (isRequestUpload) return;
     loadCategories();
-    loadEmployees();
-  }, []);
+    if (canPickEmployee) loadEmployees();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRequestUpload]);
 
   const loadCategories = async () => {
     try {
@@ -63,14 +75,16 @@ export default function DocumentUpload() {
       return;
     }
 
-    if (!formData.employeeId) {
-      toast.error('Please select an employee');
-      return;
-    }
+    if (!isRequestUpload) {
+      if (canPickEmployee && !formData.employeeId) {
+        toast.error('Please select an employee');
+        return;
+      }
 
-    if (!formData.categoryId) {
-      toast.error('Please select a category');
-      return;
+      if (!formData.categoryId) {
+        toast.error('Please select a category');
+        return;
+      }
     }
 
     if (!formData.title) {
@@ -80,16 +94,26 @@ export default function DocumentUpload() {
 
     const formDataToSend = new FormData();
     formDataToSend.append('file', file);
-    formDataToSend.append('employeeId', formData.employeeId);
-    formDataToSend.append('categoryId', formData.categoryId);
     formDataToSend.append('title', formData.title);
     formDataToSend.append('description', formData.description);
+    if (!isRequestUpload) {
+      // Omit employeeId entirely for self-service uploads — the backend
+      // falls back to the authenticated user's own employee record.
+      if (formData.employeeId) formDataToSend.append('employeeId', formData.employeeId);
+      formDataToSend.append('categoryId', formData.categoryId);
+    }
 
     try {
       setLoading(true);
-      await documentService.uploadDocument(formDataToSend);
-      toast.success('Document uploaded successfully');
-      navigate('/documents');
+      if (isRequestUpload) {
+        await documentRequestService.uploadForRequest(requestId, formDataToSend);
+        toast.success('Document submitted for the request');
+        navigate('/documents/requests');
+      } else {
+        await documentService.uploadDocument(formDataToSend);
+        toast.success('Document uploaded successfully');
+        navigate('/documents');
+      }
     } catch (error) {
       toast.error(error.response?.data?.message || error.message || 'Failed to upload document');
     } finally {
@@ -165,25 +189,28 @@ export default function DocumentUpload() {
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Employee
-          </label>
-          <select
-            value={formData.employeeId}
-            onChange={(e) => setFormData(prev => ({ ...prev, employeeId: e.target.value }))}
-            required
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="">Select an employee</option>
-            {employees.map((emp) => (
-              <option key={emp.id} value={emp.id}>
-                {emp.firstName} {emp.lastName} ({emp.employeeId})
-              </option>
-            ))}
-          </select>
-        </div>
+        {!isRequestUpload && canPickEmployee && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Employee
+            </label>
+            <select
+              value={formData.employeeId}
+              onChange={(e) => setFormData(prev => ({ ...prev, employeeId: e.target.value }))}
+              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">Select an employee</option>
+              {employees.map((emp) => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.firstName} {emp.lastName} ({emp.employeeId})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
+        {!isRequestUpload && (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Category
@@ -202,11 +229,12 @@ export default function DocumentUpload() {
             ))}
           </select>
         </div>
+        )}
 
         <Input
           label="Title"
           value={formData.title}
-          onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+          onChange={(v) => setFormData(prev => ({ ...prev, title: v }))}
           required
         />
 

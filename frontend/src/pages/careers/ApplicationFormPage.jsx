@@ -6,7 +6,7 @@ import { LoadingState, ErrorState } from '../../components/ui/States';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 
-const SOURCE_TYPES = ['CAREER_PAGE', 'REFERRAL', 'LINKEDIN', 'INDEED', 'OTHER'];
+const SOURCE_TYPES = ['CAREERS_PAGE', 'LINKEDIN', 'REFERRAL', 'JOB_BOARD', 'AGENCY', 'DIRECT_APPLICATION', 'OTHER'];
 
 export default function ApplicationFormPage() {
   const navigate = useNavigate();
@@ -27,7 +27,7 @@ export default function ApplicationFormPage() {
     skills: '',
     experience: '',
     education: '',
-    source: 'CAREER_PAGE',
+    source: 'CAREERS_PAGE',
     resume: null,
   });
 
@@ -39,7 +39,7 @@ export default function ApplicationFormPage() {
     try {
       setLoading(true);
       setError(null);
-      const jobRes = await publicJobService.getPublicJobBySlug(slug);
+      const jobRes = await publicJobService.getJobBySlug(slug);
       setJob(jobRes);
     } catch (err) {
       setError(err.message);
@@ -65,11 +65,23 @@ export default function ApplicationFormPage() {
     try {
       setSubmitting(true);
       setError(null);
-      const payload = {
-        ...formData,
-        skills: formData.skills.split(',').map((s) => s.trim()).filter(Boolean),
-      };
-      await publicJobService.submitApplication(slug, payload);
+      const data = new FormData();
+      data.append('firstName', formData.firstName);
+      data.append('lastName', formData.lastName);
+      data.append('email', formData.email);
+      data.append('phone', formData.phone);
+      data.append('location', formData.location);
+      data.append('currentCompany', formData.currentCompany);
+      // Backend Candidate field is `currentJobTitle`, not `currentRole`.
+      data.append('currentJobTitle', formData.currentRole);
+      data.append('skills', formData.skills.split(',').map((s) => s.trim()).filter(Boolean).join(','));
+      data.append('summary', formData.summary);
+      data.append('experience', formData.experience);
+      data.append('education', formData.education);
+      data.append('source', formData.source);
+      data.append('resume', formData.resume);
+
+      await publicJobService.applyToJob(job.id, data);
       navigate('/careers/success');
     } catch (err) {
       setError(err.message);
@@ -99,25 +111,25 @@ export default function ApplicationFormPage() {
             <div>
               <h3 className="mb-4 text-sm font-semibold text-ink-900">Personal Information</h3>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Input label="First Name" required value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} />
-                <Input label="Last Name" required value={formData.lastName} onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} />
-                <Input label="Email" type="email" required value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
-                <Input label="Phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
-                <Input label="Location" value={formData.location} onChange={(e) => setFormData({ ...formData, location: e.target.value })} />
+                <Input label="First Name" required value={formData.firstName} onChange={(v) => setFormData({ ...formData, firstName: v })} />
+                <Input label="Last Name" required value={formData.lastName} onChange={(v) => setFormData({ ...formData, lastName: v })} />
+                <Input label="Email" type="email" required value={formData.email} onChange={(v) => setFormData({ ...formData, email: v })} />
+                <Input label="Phone" value={formData.phone} onChange={(v) => setFormData({ ...formData, phone: v })} />
+                <Input label="Location" value={formData.location} onChange={(v) => setFormData({ ...formData, location: v })} />
               </div>
             </div>
 
             <div>
               <h3 className="mb-4 text-sm font-semibold text-ink-900">Professional Information</h3>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Input label="Current Role" value={formData.currentRole} onChange={(e) => setFormData({ ...formData, currentRole: e.target.value })} />
-                <Input label="Current Company" value={formData.currentCompany} onChange={(e) => setFormData({ ...formData, currentCompany: e.target.value })} />
+                <Input label="Current Role" value={formData.currentRole} onChange={(v) => setFormData({ ...formData, currentRole: v })} />
+                <Input label="Current Company" value={formData.currentCompany} onChange={(v) => setFormData({ ...formData, currentCompany: v })} />
               </div>
               <div className="mt-4 space-y-4">
-                <Input label="Summary" textarea rows={3} value={formData.summary} onChange={(e) => setFormData({ ...formData, summary: e.target.value })} />
-                <Input label="Skills (comma-separated)" value={formData.skills} onChange={(e) => setFormData({ ...formData, skills: e.target.value })} />
-                <Input label="Experience" textarea rows={3} value={formData.experience} onChange={(e) => setFormData({ ...formData, experience: e.target.value })} />
-                <Input label="Education" textarea rows={3} value={formData.education} onChange={(e) => setFormData({ ...formData, education: e.target.value })} />
+                <Input label="Summary" textarea rows={3} value={formData.summary} onChange={(v) => setFormData({ ...formData, summary: v })} />
+                <Input label="Skills (comma-separated)" value={formData.skills} onChange={(v) => setFormData({ ...formData, skills: v })} />
+                <Input label="Experience" textarea rows={3} value={formData.experience} onChange={(v) => setFormData({ ...formData, experience: v })} />
+                <Input label="Education" textarea rows={3} value={formData.education} onChange={(v) => setFormData({ ...formData, education: v })} />
               </div>
             </div>
 

@@ -39,6 +39,29 @@ export const STATUS_TONES = {
   PLANNING: 'neutral',
   ON_HOLD: 'warning',
   COMPLETED: 'success',
+  // Asset lifecycle statuses
+  AVAILABLE: 'success',
+  RESERVED: 'info',
+  ASSIGNED: 'brand',
+  IN_MAINTENANCE: 'warning',
+  DAMAGED: 'danger',
+  LOST: 'danger',
+  RETURNED: 'neutral',
+  RETIRED: 'neutral',
+  DISPOSED: 'neutral',
+  // Asset condition
+  NEW: 'success',
+  EXCELLENT: 'success',
+  GOOD: 'info',
+  FAIR: 'warning',
+  // Asset request / maintenance statuses
+  FULFILLED: 'success',
+  OPEN: 'warning',
+  WAITING_FOR_PARTS: 'warning',
+  // Warranty status (ACTIVE reuses the tone mapped above)
+  EXPIRING_SOON: 'warning',
+  EXPIRED: 'danger',
+  NONE: 'neutral',
 };
 
 export const PRIORITY_TONES = {

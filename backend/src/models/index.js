@@ -31,4 +31,10 @@ module.exports = {
   OnboardingTemplate: require('./OnboardingTemplate'),
   OnboardingProcess: require('./OnboardingProcess'),
   OnboardingTask: require('./OnboardingTask'),
+  AssetCategory: require('./AssetCategory'),
+  AssetVendor: require('./AssetVendor'),
+  Asset: require('./Asset'),
+  AssetHistory: require('./AssetHistory'),
+  AssetRequest: require('./AssetRequest'),
+  AssetMaintenance: require('./AssetMaintenance'),
 };

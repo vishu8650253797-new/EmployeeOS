@@ -59,13 +59,13 @@ export const documentService = {
 
   // Verify a document
   verifyDocument: async (id, data) => {
-    const response = await api.post(`/documents/${id}/verify`, data);
+    const response = await api.patch(`/documents/${id}/verify`, data);
     return response.data.data;
   },
 
   // Reject a document
   rejectDocument: async (id, data) => {
-    const response = await api.post(`/documents/${id}/reject`, data);
+    const response = await api.patch(`/documents/${id}/reject`, data);
     return response.data.data;
   },
 };

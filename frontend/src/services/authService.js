@@ -15,6 +15,7 @@ function normalizeUser(data) {
     email: user.email,
     role: user.role,
     organizationId: user.organizationId?._id || user.organizationId,
+    employeeId: user.employeeId?._id || user.employeeId || null,
     avatar: user.avatar || null,
     jobTitle: user.jobTitle || '',
     department: user.department || '',
@@ -45,6 +46,16 @@ export const authService = {
     const user = normalizeUser(response.data);
     this.setAccessToken(response.data.accessToken);
     return user;
+  },
+
+  async forgotPassword(email) {
+    const response = await publicApi.post('/auth/forgot-password', { email });
+    return response.data;
+  },
+
+  async resetPassword({ token, password }) {
+    const response = await publicApi.post('/auth/reset-password', { token, password });
+    return response.data;
   },
 
   async logout() {

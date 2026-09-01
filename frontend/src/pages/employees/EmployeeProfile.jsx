@@ -16,9 +16,11 @@ import {
   FolderOpen,
   TrendingUp,
   LayoutGrid,
+  Package,
 } from 'lucide-react';
 import { employeeService } from '../../services/employeeService';
 import { attendanceService } from '../../services/attendanceService';
+import { assetService } from '../../services/assetService';
 import { useFetch } from '../../hooks/useFetch';
 import { useToast } from '../../context/ToastContext';
 import { formatDate, fullName, formatAddress, roleLabel } from '../../utils/format';
@@ -37,6 +39,7 @@ const TABS = [
   { value: 'overview', label: 'Overview', icon: LayoutGrid },
   { value: 'attendance', label: 'Attendance', icon: CalendarCheck },
   { value: 'leave', label: 'Leave', icon: CalendarOff },
+  { value: 'assets', label: 'Assets', icon: Package },
   { value: 'tasks', label: 'Tasks', icon: ClipboardList },
   { value: 'documents', label: 'Documents', icon: FolderOpen },
   { value: 'performance', label: 'Performance', icon: TrendingUp },
@@ -200,6 +203,48 @@ function LeaveTab({ employee }) {
   );
 }
 
+function AssetsTab({ employee }) {
+  const navigate = useNavigate();
+  const { data: assets, loading, error, refetch } = useFetch(
+    () => assetService.getEmployeeAssets(employee.id),
+    [employee.id]
+  );
+
+  if (loading) return <CardSkeleton lines={4} />;
+  if (error) return <ErrorState message={error} onRetry={refetch} />;
+
+  return (
+    <Card padding={false}>
+      <CardHeader title="Assigned assets" subtitle={`${assets.length} asset(s)`} className="px-5 pt-5" />
+      {assets.length === 0 ? (
+        <EmptyState icon={Package} title="No assigned assets" message="Assets assigned to this employee will appear here." />
+      ) : (
+        <ul className="mt-2 divide-y divide-line">
+          {assets.map((asset) => (
+            <li key={asset.id} className="flex items-center justify-between gap-3 px-5 py-3.5">
+              <button
+                type="button"
+                onClick={() => navigate(`/assets/${asset.id}`)}
+                className="focus-ring rounded-lg text-left"
+              >
+                <span className="block text-[13px] font-medium text-ink-900 hover:text-brand-700">{asset.name}</span>
+                <span className="block text-xs text-ink-400">
+                  {asset.assetTag} · {asset.categoryId?.name}
+                </span>
+              </button>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-ink-500">Assigned {formatDate(asset.assignedAt)}</span>
+                <StatusBadge status={asset.condition} />
+                <StatusBadge status={asset.status} />
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
 function PlaceholderTab({ icon, title, message }) {
   return (
     <Card padding={false}>
@@ -315,6 +360,7 @@ export default function EmployeeProfile() {
       {activeTab === 'overview' && <OverviewTab employee={employee} />}
       {activeTab === 'attendance' && <AttendanceTab employee={employee} />}
       {activeTab === 'leave' && <LeaveTab employee={employee} />}
+      {activeTab === 'assets' && <AssetsTab employee={employee} />}
       {activeTab === 'tasks' && (
         <PlaceholderTab
           icon={ClipboardList}
