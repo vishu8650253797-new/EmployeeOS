@@ -222,9 +222,17 @@ async function deleteTask(organizationId, id) {
   return { success: true, message: 'Task deleted' };
 }
 
-async function updateTaskStatus(organizationId, id, status) {
+const TASK_STATUS_ELEVATED_ROLES = ['SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'];
+
+async function updateTaskStatus(organizationId, id, status, actor) {
   const item = await Task.findOne({ _id: id, organizationId: new Types.ObjectId(organizationId) });
   if (!item) throw new AppError('Task not found', 404);
+
+  const isAssignee = actor.employeeId && item.assigneeIds.some((a) => a.toString() === actor.employeeId.toString());
+  const isReporter = actor.employeeId && item.reporterId.toString() === actor.employeeId.toString();
+  if (!isAssignee && !isReporter && !TASK_STATUS_ELEVATED_ROLES.includes(actor.role)) {
+    throw new AppError('You are not authorized to update this task\'s status', 403);
+  }
 
   if (!['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'BLOCKED', 'DONE'].includes(status)) {
     throw new AppError('Invalid status', 400);

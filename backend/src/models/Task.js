@@ -29,5 +29,6 @@ taskSchema.index({ organizationId: 1, priority: 1 });
 taskSchema.index({ organizationId: 1, assigneeIds: 1 });
 taskSchema.index({ organizationId: 1, dueDate: 1 });
 taskSchema.index({ organizationId: 1, taskKey: 1 });
+taskSchema.index({ organizationId: 1, projectId: 1, createdAt: -1 });
 
 module.exports = model('Task', taskSchema);

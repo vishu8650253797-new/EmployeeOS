@@ -188,7 +188,7 @@ export default function Projects() {
                 </div>
                 <Dropdown
                   trigger={() => (
-                    <button className="p-1 hover:bg-gray-100 rounded">
+                    <button className="p-1 hover:bg-gray-100 rounded" aria-label={`Actions for ${project.name}`}>
                       <MoreHorizontal className="w-5 h-5 text-gray-500" />
                     </button>
                   )}

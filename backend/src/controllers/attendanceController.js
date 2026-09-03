@@ -45,7 +45,8 @@ exports.getDepartmentAttendance = async (req, res) => {
   const data = await attendanceService.getDepartmentAttendance(
     req.organizationId,
     req.params.departmentId,
-    req.query
+    req.query,
+    req.user
   );
   res.status(200).json({ success: true, message: 'Department attendance retrieved successfully', data });
 };
@@ -59,7 +60,8 @@ exports.getDepartmentStats = async (req, res) => {
   const data = await attendanceService.getDepartmentStats(
     req.organizationId,
     req.params.departmentId,
-    req.query
+    req.query,
+    req.user
   );
   res.status(200).json({ success: true, message: 'Department statistics retrieved successfully', data });
 };

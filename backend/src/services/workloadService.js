@@ -11,6 +11,7 @@ async function getWorkload(organizationId, filters = {}) {
   if (status) query.status = status;
 
   const employees = await Employee.find(query)
+    .select('firstName lastName email employeeId departmentId')
     .populate('departmentId', 'name')
     .lean();
 
@@ -25,6 +26,7 @@ async function getWorkload(organizationId, filters = {}) {
   if (status) taskQuery.status = status;
 
   const tasks = await Task.find(taskQuery)
+    .select('taskKey title status priority dueDate estimatedHours assigneeIds projectId')
     .populate('projectId', 'name key')
     .lean();
 

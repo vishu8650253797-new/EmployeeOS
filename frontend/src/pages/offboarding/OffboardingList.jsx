@@ -259,7 +259,7 @@ export default function OffboardingList() {
                         trigger={({ open }) => (
                           <button
                             type="button"
-                            aria-label="Actions"
+                            aria-label={`Actions for ${record.employeeId ? fullName(record.employeeId) : 'this record'}`}
                             aria-expanded={open}
                             className="focus-ring rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-ink-400/10 hover:text-ink-700"
                           >

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Users,
   UserCheck,
@@ -14,7 +14,8 @@ import {
 import { attendanceService } from '../../services/attendanceService';
 import { departmentService } from '../../services/departmentService';
 import { useFetch } from '../../hooks/useFetch';
-import { useWebSocket } from '../../hooks/useWebSocket';
+import { useSocketEvent } from '../../hooks/useSocket';
+import { SOCKET_EVENTS } from '../../utils/socketEvents';
 import { ATTENDANCE_STATUSES } from '../../data/attendance';
 import { formatDate } from '../../utils/format';
 import PageHeader from '../../components/layout/PageHeader';
@@ -81,18 +82,14 @@ export default function Attendance() {
   const records = response?.records || [];
   const pagination = response?.pagination || { page: 1, totalPages: 1 };
 
-  useEffect(() => {
-    setPage(1);
-  }, [date, departmentId, status, search]);
+  function updateFilter(setter) {
+    return (value) => {
+      setter(value);
+      setPage(1);
+    };
+  }
 
-  const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:5100';
-  const { lastMessage } = useWebSocket(WS_URL);
-
-  useEffect(() => {
-    if (lastMessage?.type === 'attendance:updated') {
-      refetch();
-    }
-  }, [lastMessage, refetch]);
+  useSocketEvent(SOCKET_EVENTS.ATTENDANCE_UPDATED, refetch, [refetch]);
 
   const statCards = summary
     ? [
@@ -145,13 +142,13 @@ export default function Attendance() {
             type="date"
             label="Date"
             value={date}
-            onChange={(v) => setDate(v)}
+            onChange={updateFilter(setDate)}
             className="sm:w-44"
           />
           <Select
             label="Department"
             value={departmentId}
-            onChange={(v) => setDepartmentId(v)}
+            onChange={updateFilter(setDepartmentId)}
             options={departmentOptions}
             placeholder="All departments"
             className="sm:w-48"
@@ -159,7 +156,7 @@ export default function Attendance() {
           <Select
             label="Status"
             value={status}
-            onChange={(v) => setStatus(v)}
+            onChange={updateFilter(setStatus)}
             options={statusOptions}
             placeholder="All statuses"
             className="sm:w-44"
@@ -168,7 +165,7 @@ export default function Attendance() {
             type="text"
             label="Search"
             value={search}
-            onChange={(v) => setSearch(v)}
+            onChange={updateFilter(setSearch)}
             placeholder="Name, ID or email"
             icon={Search}
             className="sm:w-64"

@@ -21,7 +21,7 @@ app.use(
   })
 );
 app.use(helmet());
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
 if (process.env.NODE_ENV !== 'test') {
@@ -37,6 +37,19 @@ const limiter = rateLimit({
   skip: () => process.env.NODE_ENV !== 'production',
 });
 app.use('/api/', limiter);
+
+// Brute-force/enumeration-sensitive auth endpoints get their own stricter,
+// always-active limit — unlike the general API limiter above, this one isn't
+// skipped outside production, since credential-stuffing/enumeration attempts
+// are just as real a risk in a staging environment as in production.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { success: false, message: 'Too many attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(['/api/auth/login', '/api/auth/register', '/api/auth/forgot-password', '/api/auth/reset-password'], authLimiter);
 
 app.use('/api', routes);
 

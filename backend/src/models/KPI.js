@@ -81,5 +81,7 @@ const kpiSchema = new mongoose.Schema({
 
 kpiSchema.index({ organizationId: 1, employeeId: 1 });
 kpiSchema.index({ organizationId: 1, cycleId: 1 });
+kpiSchema.index({ organizationId: 1, employeeId: 1, cycleId: 1 });
+kpiSchema.index({ organizationId: 1, createdAt: -1 });
 
 module.exports = mongoose.model('KPI', kpiSchema);

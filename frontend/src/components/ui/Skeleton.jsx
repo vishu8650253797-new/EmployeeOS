@@ -23,7 +23,7 @@ export function TableSkeleton({ rows = 6, cols = 5 }) {
   );
 }
 
-export function CardSkeleton({ lines = 3 }) {
+function CardSkeletonBlock({ lines }) {
   return (
     <div
       className="rounded-xl border border-line bg-surface p-5 shadow-card"
@@ -33,6 +33,17 @@ export function CardSkeleton({ lines = 3 }) {
       <Skeleton className="mb-3 h-4 w-1/3" />
       {Array.from({ length: lines }).map((_, index) => (
         <Skeleton key={index} className={`mb-2 h-3.5 ${index % 2 === 0 ? 'w-full' : 'w-3/4'}`} />
+      ))}
+    </div>
+  );
+}
+
+export function CardSkeleton({ lines = 3, count }) {
+  if (!count) return <CardSkeletonBlock lines={lines} />;
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: count }).map((_, index) => (
+        <CardSkeletonBlock key={index} lines={lines} />
       ))}
     </div>
   );

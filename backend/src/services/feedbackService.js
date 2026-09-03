@@ -63,7 +63,7 @@ exports.getFeedback = async (organizationId, query = {}) => {
   };
 };
 
-exports.getFeedbackById = async (organizationId, feedbackId) => {
+exports.getFeedbackById = async (organizationId, feedbackId, actor) => {
   const feedback = await Feedback.findOne({
     _id: feedbackId,
     organizationId
@@ -74,6 +74,13 @@ exports.getFeedbackById = async (organizationId, feedbackId) => {
 
   if (!feedback) {
     throw new Error('Feedback not found');
+  }
+
+  const isAuthor = actor._id && actor._id.toString() === feedback.authorId._id.toString();
+  const isSubject = actor.employeeId && actor.employeeId.toString() === feedback.employeeId._id.toString();
+  const canViewAsSubject = isSubject && feedback.visibility === 'SHARED_WITH_EMPLOYEE';
+  if (!ELEVATED_ROLES.includes(actor.role) && !isAuthor && !canViewAsSubject) {
+    throw new AppError('You are not authorized to view this feedback', 403);
   }
 
   return feedback;
@@ -150,7 +157,7 @@ exports.deleteFeedback = async (organizationId, feedbackId) => {
   return { success: true, message: 'Feedback deleted' };
 };
 
-exports.getFeedbackRequests = async (organizationId, query = {}) => {
+exports.getFeedbackRequests = async (organizationId, query = {}, actor) => {
   const {
     page = 1,
     limit = 20,
@@ -176,6 +183,13 @@ exports.getFeedbackRequests = async (organizationId, query = {}) => {
 
   if (requestedFrom) {
     filter.requestedFrom = requestedFrom;
+  }
+
+  // Non-elevated callers only ever see feedback requests assigned to them —
+  // org-wide visibility (who's being asked to give feedback about whom) is
+  // reserved for HR/admin/manager.
+  if (!ELEVATED_ROLES.includes(actor.role)) {
+    filter.requestedFrom = actor._id;
   }
 
   const skip = (page - 1) * limit;

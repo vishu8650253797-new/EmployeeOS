@@ -6,7 +6,7 @@ exports.getFeedback = async (req, res) => {
 };
 
 exports.getFeedbackById = async (req, res) => {
-  const data = await feedbackService.getFeedbackById(req.organizationId, req.params.id);
+  const data = await feedbackService.getFeedbackById(req.organizationId, req.params.id, req.user);
   res.json({ success: true, data });
 };
 
@@ -31,7 +31,7 @@ exports.deleteFeedback = async (req, res) => {
 };
 
 exports.getFeedbackRequests = async (req, res) => {
-  const { data, pagination } = await feedbackService.getFeedbackRequests(req.organizationId, req.query);
+  const { data, pagination } = await feedbackService.getFeedbackRequests(req.organizationId, req.query, req.user);
   res.json({ success: true, data, pagination });
 };
 

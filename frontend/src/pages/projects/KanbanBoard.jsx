@@ -165,7 +165,7 @@ export default function KanbanBoard() {
                     </div>
                     <Dropdown
                       trigger={() => (
-                        <button className="p-1 hover:bg-gray-100 rounded">
+                        <button className="p-1 hover:bg-gray-100 rounded" aria-label={`Actions for ${task.title}`}>
                           <MoreHorizontal className="w-4 h-4 text-gray-500" />
                         </button>
                       )}

@@ -20,9 +20,11 @@ exports.getOverviewAnalytics = async (organizationId, cycleId) => {
   const goalCompletionRate = totalGoals > 0 ? (completedGoals / totalGoals) * 100 : 0;
   const reviewCompletionRate = totalReviews > 0 ? (completedReviews / totalReviews) * 100 : 0;
 
-  const reviews = await PerformanceReview.find({ ...filter, status: 'COMPLETED', overallScore: { $exists: true } });
-  const averageScore = reviews.length > 0 
-    ? reviews.reduce((sum, r) => sum + r.overallScore, 0) / reviews.length 
+  const reviews = await PerformanceReview.find({ ...filter, status: 'COMPLETED', overallScore: { $exists: true } })
+    .select('overallScore')
+    .lean();
+  const averageScore = reviews.length > 0
+    ? reviews.reduce((sum, r) => sum + r.overallScore, 0) / reviews.length
     : 0;
 
   const atRiskEmployees = await performanceScoreService.checkAtRiskEmployees(organizationId, cycleId);
@@ -46,12 +48,15 @@ exports.getDepartmentAnalytics = async (organizationId, cycleId) => {
   const filter = { organizationId };
   if (cycleId) filter.cycleId = cycleId;
 
-  const employees = await Employee.find({ organizationId, status: 'ACTIVE' });
-  const departmentStats = {};
+  const employees = await Employee.find({ organizationId, status: 'ACTIVE' })
+    .select('department')
+    .lean();
+  const employeeIds = employees.map(e => e._id);
+  const employeeDeptMap = new Map(employees.map(e => [e._id.toString(), e.department || 'Unassigned']));
 
-  for (const employee of employees) {
-    const dept = employee.department || 'Unassigned';
-    
+  const departmentStats = {};
+  employees.forEach(employee => {
+    const dept = employeeDeptMap.get(employee._id.toString());
     if (!departmentStats[dept]) {
       departmentStats[dept] = {
         department: dept,
@@ -62,30 +67,38 @@ exports.getDepartmentAnalytics = async (organizationId, cycleId) => {
         scores: []
       };
     }
-
     departmentStats[dept].employeeCount++;
+  });
 
-    const goals = await EmployeeGoal.find({
+  // Batched: one query per collection across every active employee, instead of
+  // two queries per employee (the previous loop issued 2N queries for N employees).
+  const [goals, reviews] = await Promise.all([
+    EmployeeGoal.find({
       organizationId,
-      employeeId: employee._id,
+      employeeId: { $in: employeeIds },
       ...filter.cycleId ? { cycleId } : {}
-    });
-
-    departmentStats[dept].totalGoals += goals.length;
-    departmentStats[dept].completedGoals += goals.filter(g => g.status === 'COMPLETED').length;
-
-    const review = await PerformanceReview.findOne({
+    }).select('employeeId status').lean(),
+    PerformanceReview.find({
       organizationId,
-      employeeId: employee._id,
+      employeeId: { $in: employeeIds },
       reviewType: 'FINAL_REVIEW',
       status: 'COMPLETED',
       ...filter.cycleId ? { cycleId } : {}
-    });
+    }).select('employeeId overallScore').lean(),
+  ]);
 
-    if (review && review.overallScore) {
-      departmentStats[dept].scores.push(review.overallScore);
-    }
-  }
+  goals.forEach(goal => {
+    const dept = employeeDeptMap.get(goal.employeeId.toString());
+    if (!dept) return;
+    departmentStats[dept].totalGoals++;
+    if (goal.status === 'COMPLETED') departmentStats[dept].completedGoals++;
+  });
+
+  reviews.forEach(review => {
+    const dept = employeeDeptMap.get(review.employeeId.toString());
+    if (!dept || !review.overallScore) return;
+    departmentStats[dept].scores.push(review.overallScore);
+  });
 
   const result = Object.values(departmentStats).map(dept => {
     const averageScore = dept.scores.length > 0 
@@ -159,40 +172,55 @@ exports.getAtRiskEmployees = async (organizationId, cycleId) => {
   const employees = await Employee.find({
     _id: { $in: atRiskEmployeeIds },
     organizationId
-  });
+  }).select('firstName lastName employeeId department').lean();
 
-  const result = [];
-
-  for (const employee of employees) {
-    const goals = await EmployeeGoal.find({
+  // Batched: one query per collection across every at-risk employee, instead
+  // of two queries per employee (the previous loop issued 2N queries for N employees).
+  const [goals, kpis] = await Promise.all([
+    EmployeeGoal.find({
       organizationId,
-      employeeId: employee._id,
+      employeeId: { $in: atRiskEmployeeIds },
       cycleId,
       status: 'AT_RISK'
-    });
-
-    const kpis = await KPI.find({
+    }).select('employeeId title progressPercentage').lean(),
+    KPI.find({
       organizationId,
-      employeeId: employee._id,
+      employeeId: { $in: atRiskEmployeeIds },
       cycleId,
       status: 'BEHIND'
-    });
+    }).select('employeeId name score').lean(),
+  ]);
 
-    result.push({
+  const goalsByEmployee = new Map();
+  goals.forEach(g => {
+    const key = g.employeeId.toString();
+    if (!goalsByEmployee.has(key)) goalsByEmployee.set(key, []);
+    goalsByEmployee.get(key).push(g);
+  });
+  const kpisByEmployee = new Map();
+  kpis.forEach(k => {
+    const key = k.employeeId.toString();
+    if (!kpisByEmployee.has(key)) kpisByEmployee.set(key, []);
+    kpisByEmployee.get(key).push(k);
+  });
+
+  return employees.map(employee => {
+    const employeeGoals = goalsByEmployee.get(employee._id.toString()) || [];
+    const employeeKpis = kpisByEmployee.get(employee._id.toString()) || [];
+
+    return {
       employeeId: employee._id,
       employeeName: `${employee.firstName} ${employee.lastName}`,
       employeeIdCode: employee.employeeId,
       department: employee.department,
-      atRiskGoals: goals.length,
-      atRiskKPIs: kpis.length,
+      atRiskGoals: employeeGoals.length,
+      atRiskKPIs: employeeKpis.length,
       riskFactors: [
-        ...goals.map(g => ({ type: 'goal', name: g.title, progress: g.progressPercentage })),
-        ...kpis.map(k => ({ type: 'kpi', name: k.name, score: k.score }))
+        ...employeeGoals.map(g => ({ type: 'goal', name: g.title, progress: g.progressPercentage })),
+        ...employeeKpis.map(k => ({ type: 'kpi', name: k.name, score: k.score }))
       ]
-    });
-  }
-
-  return result;
+    };
+  });
 };
 
 exports.getEmployeePerformanceSummary = async (organizationId, employeeId, cycleId) => {

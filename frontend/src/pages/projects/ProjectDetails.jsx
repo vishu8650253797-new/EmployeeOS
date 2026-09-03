@@ -215,6 +215,7 @@ export default function ProjectDetails() {
                     <button
                       onClick={() => handleRemoveMember(member.id)}
                       className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-red-600"
+                      aria-label={`Remove ${fullName(member)} from project`}
                     >
                       <UserMinus className="w-4 h-4" />
                     </button>

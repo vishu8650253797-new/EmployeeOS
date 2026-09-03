@@ -88,7 +88,7 @@ export default function TaskList() {
           onAction={search ? null : () => navigate(`/projects/${id}/tasks/new`)}
         />
       ) : (
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
@@ -154,7 +154,7 @@ export default function TaskList() {
                   <td className="px-6 py-4 text-right">
                     <Dropdown
                       trigger={() => (
-                        <button className="p-1 hover:bg-gray-100 rounded">
+                        <button className="p-1 hover:bg-gray-100 rounded" aria-label={`Actions for ${task.title}`}>
                           <MoreHorizontal className="w-5 h-5 text-gray-500" />
                         </button>
                       )}

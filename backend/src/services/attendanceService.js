@@ -1,5 +1,5 @@
 const { Types } = require('mongoose');
-const { Attendance, Employee, User, Organization } = require('../models');
+const { Attendance, Employee, User, Organization, Department } = require('../models');
 const AppError = require('../utils/AppError');
 const { getSocketInstance } = require('../socket/socketServer');
 const SOCKET_EVENTS = require('../utils/socketEvents');
@@ -264,13 +264,17 @@ async function getMyHistory(user, query = {}) {
       .sort({ date: -1 })
       .skip(skip)
       .limit(limitNum)
+      .populate({
+        path: 'employeeId',
+        select: 'firstName lastName employeeId departmentId email',
+        populate: { path: 'departmentId', select: 'name code' },
+      })
       .lean(),
     Attendance.countDocuments(filter),
   ]);
 
-  const populated = await Promise.all(records.map((r) => populateRecord(r._id)));
   return {
-    records: populated.map((r) => toAttendanceDTO(r, settings.timeZone)),
+    records: records.map((r) => toAttendanceDTO(r, settings.timeZone)),
     pagination: buildPagination(total, pageNum, limitNum),
   };
 }
@@ -337,12 +341,20 @@ async function getAttendance(organizationId, query = {}) {
   const skip = (pageNum - 1) * limitNum;
 
   const [records, total] = await Promise.all([
-    Attendance.find(filter).sort(sort).skip(skip).limit(limitNum).lean(),
+    Attendance.find(filter)
+      .sort(sort)
+      .skip(skip)
+      .limit(limitNum)
+      .populate({
+        path: 'employeeId',
+        select: 'firstName lastName employeeId departmentId email',
+        populate: { path: 'departmentId', select: 'name code' },
+      })
+      .lean(),
     Attendance.countDocuments(filter),
   ]);
 
-  const populated = await Promise.all(records.map((r) => populateRecord(r._id)));
-  const dtoRecords = populated.map((r) => toAttendanceDTO(r, settings.timeZone));
+  const dtoRecords = records.map((r) => toAttendanceDTO(r, settings.timeZone));
 
   if ((search || departmentId) && employeeMap.size > 0) {
     const filtered = dtoRecords.filter((r) => {
@@ -436,15 +448,41 @@ async function getEmployeeAttendance(organizationId, employeeId, query = {}, use
   const skip = (pageNum - 1) * limitNum;
 
   const [records, total] = await Promise.all([
-    Attendance.find(filter).sort({ date: -1 }).skip(skip).limit(limitNum).lean(),
+    Attendance.find(filter)
+      .sort({ date: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .populate({
+        path: 'employeeId',
+        select: 'firstName lastName employeeId departmentId email',
+        populate: { path: 'departmentId', select: 'name code' },
+      })
+      .lean(),
     Attendance.countDocuments(filter),
   ]);
 
-  const populated = await Promise.all(records.map((r) => populateRecord(r._id)));
-  return { records: populated.map((r) => toAttendanceDTO(r, settings.timeZone)), pagination: buildPagination(total, pageNum, limitNum) };
+  return { records: records.map((r) => toAttendanceDTO(r, settings.timeZone)), pagination: buildPagination(total, pageNum, limitNum) };
 }
 
-async function getDepartmentAttendance(organizationId, departmentId, query = {}) {
+// A MANAGER may only pull attendance/stats for a department they actually
+// head — the route only gates by role, so without this a MANAGER could view
+// any department in the org by guessing/enumerating departmentId.
+async function assertManagerHeadsDepartment(organizationId, departmentId, actor) {
+  if (['SUPER_ADMIN', 'HR_ADMIN'].includes(actor.role)) return;
+  if (actor.role === 'MANAGER') {
+    const department = await Department.findOne({
+      _id: departmentId,
+      organizationId: new Types.ObjectId(organizationId),
+      headId: actor.employeeId,
+    }).select('_id').lean();
+    if (department) return;
+    throw new AppError('You can only view attendance for a department you head', 403);
+  }
+  throw new AppError('Forbidden: insufficient permissions', 403);
+}
+
+async function getDepartmentAttendance(organizationId, departmentId, query = {}, actor) {
+  if (actor) await assertManagerHeadsDepartment(organizationId, departmentId, actor);
   const settings = await getAttendanceSettings(organizationId);
   const organizationIdObj = new Types.ObjectId(organizationId);
   const employees = await Employee.find({ organizationId: organizationIdObj, departmentId: new Types.ObjectId(departmentId) })
@@ -466,12 +504,20 @@ async function getDepartmentAttendance(organizationId, departmentId, query = {})
   const skip = (pageNum - 1) * limitNum;
 
   const [records, total] = await Promise.all([
-    Attendance.find(filter).sort({ date: -1 }).skip(skip).limit(limitNum).lean(),
+    Attendance.find(filter)
+      .sort({ date: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .populate({
+        path: 'employeeId',
+        select: 'firstName lastName employeeId departmentId email',
+        populate: { path: 'departmentId', select: 'name code' },
+      })
+      .lean(),
     Attendance.countDocuments(filter),
   ]);
 
-  const populated = await Promise.all(records.map((r) => populateRecord(r._id)));
-  return { records: populated.map((r) => toAttendanceDTO(r, settings.timeZone)), pagination: buildPagination(total, pageNum, limitNum) };
+  return { records: records.map((r) => toAttendanceDTO(r, settings.timeZone)), pagination: buildPagination(total, pageNum, limitNum) };
 }
 
 async function getAttendanceStats(organizationId, query = {}) {
@@ -508,18 +554,19 @@ async function getAttendanceStats(organizationId, query = {}) {
   };
 }
 
-async function getDepartmentStats(organizationId, departmentId, query = {}) {
+async function getDepartmentStats(organizationId, departmentId, query = {}, actor) {
+  if (actor) await assertManagerHeadsDepartment(organizationId, departmentId, actor);
   const settings = await getAttendanceSettings(organizationId);
   const organizationIdObj = new Types.ObjectId(organizationId);
   const date = query.date || getOrgDate(settings.timeZone);
 
-  const [employees, records] = await Promise.all([
-    Employee.find({ organizationId: organizationIdObj, departmentId: new Types.ObjectId(departmentId) }).lean(),
-    Attendance.find({ organizationId: organizationIdObj, date }).populate('employeeId', 'departmentId').lean(),
-  ]);
-
-  const employeeIds = new Set(employees.map((e) => e._id.toString()));
-  const deptRecords = records.filter((r) => employeeIds.has(r.employeeId?._id?.toString() || r.employeeId?.toString()));
+  const employees = await Employee.find({ organizationId: organizationIdObj, departmentId: new Types.ObjectId(departmentId) })
+    .select('_id')
+    .lean();
+  const employeeIds = employees.map((e) => e._id);
+  const deptRecords = employeeIds.length
+    ? await Attendance.find({ organizationId: organizationIdObj, date, employeeId: { $in: employeeIds } }).select('status').lean()
+    : [];
   const totalEmployees = employees.length;
   const present = deptRecords.filter((r) => r.status === 'PRESENT').length;
   const late = deptRecords.filter((r) => r.status === 'LATE').length;

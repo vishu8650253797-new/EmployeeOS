@@ -29,7 +29,7 @@ exports.deleteTask = async (req, res) => {
 
 exports.updateTaskStatus = async (req, res) => {
   const { status } = req.body;
-  const data = await taskService.updateTaskStatus(req.organizationId, req.params.id, status);
+  const data = await taskService.updateTaskStatus(req.organizationId, req.params.id, status, req.user);
   res.json({ success: true, message: 'Task status updated', data });
 };
 

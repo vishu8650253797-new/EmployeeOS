@@ -75,7 +75,7 @@ exports.getGoals = async (organizationId, query = {}) => {
   };
 };
 
-exports.getGoalById = async (organizationId, goalId) => {
+exports.getGoalById = async (organizationId, goalId, actor) => {
   const goal = await EmployeeGoal.findOne({
     _id: goalId,
     organizationId
@@ -86,6 +86,11 @@ exports.getGoalById = async (organizationId, goalId) => {
 
   if (!goal) {
     throw new Error('Goal not found');
+  }
+
+  const isOwner = actor.employeeId && actor.employeeId.toString() === goal.employeeId._id.toString();
+  if (!isOwner && !ELEVATED_ROLES.includes(actor.role)) {
+    throw new AppError('You are not authorized to view this goal', 403);
   }
 
   return goal;
@@ -160,10 +165,20 @@ exports.createGoal = async (organizationId, goalData, userId) => {
   return goal;
 };
 
+const GOAL_UPDATABLE_FIELDS = [
+  'title', 'description', 'category', 'priority', 'status', 'targetValue', 'currentValue',
+  'unit', 'dueDate', 'cycleId',
+];
+
 exports.updateGoal = async (organizationId, goalId, goalData) => {
+  const updates = {};
+  GOAL_UPDATABLE_FIELDS.forEach((field) => {
+    if (goalData[field] !== undefined) updates[field] = goalData[field];
+  });
+
   const goal = await EmployeeGoal.findOneAndUpdate(
     { _id: goalId, organizationId },
-    goalData,
+    updates,
     { new: true, runValidators: true }
   );
 
@@ -312,7 +327,7 @@ exports.updateGoalStatus = async (organizationId, goalId, status) => {
   return goal;
 };
 
-exports.getGoalProgressHistory = async (organizationId, goalId) => {
+exports.getGoalProgressHistory = async (organizationId, goalId, actor) => {
   const goal = await EmployeeGoal.findOne({
     _id: goalId,
     organizationId
@@ -320,6 +335,11 @@ exports.getGoalProgressHistory = async (organizationId, goalId) => {
 
   if (!goal) {
     throw new Error('Goal not found');
+  }
+
+  const isOwner = actor.employeeId && actor.employeeId.toString() === goal.employeeId.toString();
+  if (!isOwner && !ELEVATED_ROLES.includes(actor.role)) {
+    throw new AppError('You are not authorized to view this goal\'s progress history', 403);
   }
 
   return await GoalProgress.find({ goalId })

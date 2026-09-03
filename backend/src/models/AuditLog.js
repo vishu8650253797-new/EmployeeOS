@@ -18,6 +18,7 @@ const auditLogSchema = new Schema(
 auditLogSchema.index({ organizationId: 1, entityType: 1, entityId: 1, createdAt: -1 });
 auditLogSchema.index({ organizationId: 1, userId: 1, createdAt: -1 });
 auditLogSchema.index({ organizationId: 1, action: 1, createdAt: -1 });
+auditLogSchema.index({ organizationId: 1, createdAt: -1 });
 
 auditLogSchema.set('toJSON', {
   transform: (doc, ret) => {

@@ -6,7 +6,7 @@ exports.getReviews = async (req, res) => {
 };
 
 exports.getReviewById = async (req, res) => {
-  const data = await performanceReviewService.getReviewById(req.organizationId, req.params.id);
+  const data = await performanceReviewService.getReviewById(req.organizationId, req.params.id, req.user);
   res.json({ success: true, data });
 };
 
@@ -41,7 +41,7 @@ exports.deleteReview = async (req, res) => {
 };
 
 exports.submitReview = async (req, res) => {
-  const data = await performanceReviewService.submitReview(req.organizationId, req.params.id, req.user._id);
+  const data = await performanceReviewService.submitReview(req.organizationId, req.params.id, req.user);
   res.json({ success: true, message: 'Performance review submitted', data });
 };
 

@@ -9,7 +9,7 @@ async function resolveEmployeeId(req) {
 }
 
 exports.getLeaveRequests = async (req, res) => {
-  const { data, pagination } = await leaveRequestService.getLeaveRequests(req.organizationId, req.query);
+  const { data, pagination } = await leaveRequestService.getLeaveRequests(req.organizationId, req.query, req.user);
   res.json({ success: true, data, pagination });
 };
 
@@ -21,6 +21,7 @@ exports.getMyLeaveRequests = async (req, res) => {
 };
 
 exports.getEmployeeLeaveRequests = async (req, res) => {
+  await leaveRequestService.assertManagerScope(req.user, req.params.employeeId);
   const { data } = await leaveRequestService.getMyLeaveRequests(req.organizationId, req.params.employeeId, req.query);
   res.json({ success: true, data });
 };

@@ -9,7 +9,7 @@ exports.getKPIs = async (req, res) => {
 };
 
 exports.getKPIById = async (req, res) => {
-  const data = await kpiService.getKPIById(req.organizationId, req.params.id);
+  const data = await kpiService.getKPIById(req.organizationId, req.params.id, req.user);
   res.json({ success: true, data });
 };
 

@@ -105,5 +105,7 @@ employeeGoalSchema.index({ organizationId: 1, employeeId: 1 });
 employeeGoalSchema.index({ organizationId: 1, cycleId: 1 });
 employeeGoalSchema.index({ organizationId: 1, status: 1 });
 employeeGoalSchema.index({ organizationId: 1, dueDate: 1 });
+employeeGoalSchema.index({ organizationId: 1, createdAt: -1 });
+employeeGoalSchema.index({ organizationId: 1, employeeId: 1, cycleId: 1 });
 
 module.exports = mongoose.model('EmployeeGoal', employeeGoalSchema);

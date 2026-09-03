@@ -88,6 +88,7 @@ employeeSchema.index({ organizationId: 1, employeeId: 1 }, { unique: true });
 employeeSchema.index({ organizationId: 1, email: 1 }, { unique: true });
 employeeSchema.index({ organizationId: 1, departmentId: 1, status: 1 });
 employeeSchema.index({ organizationId: 1, isDeleted: 1 });
+employeeSchema.index({ organizationId: 1, isDeleted: 1, createdAt: -1 });
 
 employeeSchema.set('toJSON', {
   transform: (doc, ret) => {

@@ -16,6 +16,26 @@ function assertOwnerOrElevated(actor, employeeId) {
   throw new AppError('You are not authorized to access this leave request', 403);
 }
 
+async function getDirectReportIds(managerEmployeeId) {
+  const reports = await Employee.find({ managerId: managerEmployeeId, isDeleted: false }).select('_id').lean();
+  return reports.map((r) => r._id.toString());
+}
+
+// A MANAGER's reach is scoped to their own direct reports — unlike
+// assertOwnerOrElevated, which (correctly, for read access) treats any
+// MANAGER as elevated, this guards the manager-facing list/approve/reject
+// actions so one manager can't approve/reject/browse another manager's team.
+async function assertManagerScope(actor, employeeId) {
+  if (['SUPER_ADMIN', 'HR_ADMIN'].includes(actor.role)) return;
+  if (actor.role === 'MANAGER') {
+    if (!actor.employeeId) throw new AppError('Forbidden: insufficient permissions', 403);
+    const reportIds = await getDirectReportIds(actor.employeeId);
+    if (reportIds.includes(employeeId.toString())) return;
+    throw new AppError('You can only manage leave requests for your direct reports', 403);
+  }
+  throw new AppError('Forbidden: insufficient permissions', 403);
+}
+
 function toLeaveDTO(request, employee, leaveType, reviewer) {
   const emp = employee || {};
   const lt = leaveType || {};
@@ -53,6 +73,34 @@ async function populateRequest(request) {
     request.reviewedBy ? User.findById(request.reviewedBy).lean() : null,
   ]);
   return toLeaveDTO(request, employee, leaveType, reviewer);
+}
+
+// Batched counterpart of populateRequest for list endpoints — 3 $in queries
+// total instead of 3 queries per request, which otherwise multiplies with
+// page size (up to 100 requests/page => up to 300 queries).
+async function populateRequests(requests) {
+  if (requests.length === 0) return [];
+
+  const employeeIds = [...new Set(requests.map((r) => r.employeeId.toString()))];
+  const leaveTypeIds = [...new Set(requests.map((r) => r.leaveTypeId.toString()))];
+  const reviewerIds = [...new Set(requests.filter((r) => r.reviewedBy).map((r) => r.reviewedBy.toString()))];
+
+  const [employees, leaveTypes, reviewers] = await Promise.all([
+    Employee.find({ _id: { $in: employeeIds } }).lean(),
+    LeaveType.find({ _id: { $in: leaveTypeIds } }).lean(),
+    reviewerIds.length ? User.find({ _id: { $in: reviewerIds } }).lean() : [],
+  ]);
+
+  const employeeMap = new Map(employees.map((e) => [e._id.toString(), e]));
+  const leaveTypeMap = new Map(leaveTypes.map((t) => [t._id.toString(), t]));
+  const reviewerMap = new Map(reviewers.map((u) => [u._id.toString(), u]));
+
+  return requests.map((r) => toLeaveDTO(
+    r,
+    employeeMap.get(r.employeeId.toString()),
+    leaveTypeMap.get(r.leaveTypeId.toString()),
+    r.reviewedBy ? reviewerMap.get(r.reviewedBy.toString()) : null
+  ));
 }
 
 async function findEmployeesToNotify(organizationId, requestEmployeeId) {
@@ -186,7 +234,7 @@ async function createLeaveRequest(organizationId, payload, actor) {
   return populated;
 }
 
-async function getLeaveRequests(organizationId, filters = {}) {
+async function getLeaveRequests(organizationId, filters = {}, actor) {
   const { status, employeeId, page = 1, limit = 20 } = filters;
   const pageNum = Math.max(parseInt(page, 10) || 1, 1);
   const limitNum = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
@@ -196,12 +244,24 @@ async function getLeaveRequests(organizationId, filters = {}) {
   if (status && ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'].includes(status)) query.status = status;
   if (employeeId) query.employeeId = new Types.ObjectId(employeeId);
 
+  if (actor && actor.role === 'MANAGER') {
+    if (!actor.employeeId) throw new AppError('Forbidden: insufficient permissions', 403);
+    const reportIds = await getDirectReportIds(actor.employeeId);
+    if (employeeId) {
+      if (!reportIds.includes(employeeId.toString())) {
+        throw new AppError('You can only view leave requests for your direct reports', 403);
+      }
+    } else {
+      query.employeeId = { $in: reportIds.map((id) => new Types.ObjectId(id)) };
+    }
+  }
+
   const [data, total] = await Promise.all([
     LeaveRequest.find(query).sort({ createdAt: -1 }).skip(skip).limit(limitNum).lean(),
     LeaveRequest.countDocuments(query),
   ]);
 
-  const populated = await Promise.all(data.map((r) => populateRequest(r)));
+  const populated = await populateRequests(data);
   return {
     data: populated,
     pagination: { page: pageNum, limit: limitNum, total, totalPages: Math.ceil(total / limitNum) },
@@ -217,7 +277,7 @@ async function getMyLeaveRequests(organizationId, employeeId, filters = {}) {
     query.status = filters.status;
   }
   const data = await LeaveRequest.find(query).sort({ createdAt: -1 }).lean();
-  const populated = await Promise.all(data.map((r) => populateRequest(r)));
+  const populated = await populateRequests(data);
   return { data: populated };
 }
 
@@ -231,6 +291,7 @@ async function getLeaveRequestById(organizationId, id, actor) {
 async function approveLeaveRequest(organizationId, id, actor) {
   const request = await LeaveRequest.findOne({ _id: id, organizationId: new Types.ObjectId(organizationId) });
   if (!request) throw new AppError('Leave request not found', 404);
+  await assertManagerScope(actor, request.employeeId);
   if (request.status !== 'PENDING') throw new AppError('Only pending requests can be approved', 400);
 
   await LeaveBalance.updateOne(
@@ -277,6 +338,7 @@ async function approveLeaveRequest(organizationId, id, actor) {
 async function rejectLeaveRequest(organizationId, id, actor, rejectionReason) {
   const request = await LeaveRequest.findOne({ _id: id, organizationId: new Types.ObjectId(organizationId) });
   if (!request) throw new AppError('Leave request not found', 404);
+  await assertManagerScope(actor, request.employeeId);
   if (request.status !== 'PENDING') throw new AppError('Only pending requests can be rejected', 400);
 
   await LeaveBalance.updateOne(
@@ -382,4 +444,5 @@ module.exports = {
   rejectLeaveRequest,
   cancelLeaveRequest,
   populateRequest,
+  assertManagerScope,
 };

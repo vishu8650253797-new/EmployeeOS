@@ -24,5 +24,6 @@ const leaveRequestSchema = new Schema(
 
 leaveRequestSchema.index({ organizationId: 1, status: 1 });
 leaveRequestSchema.index({ organizationId: 1, employeeId: 1, startDate: -1 });
+leaveRequestSchema.index({ organizationId: 1, status: 1, createdAt: -1 });
 
 module.exports = model('LeaveRequest', leaveRequestSchema);

@@ -9,12 +9,12 @@ const RESTRICTED_REVIEW_FIELDS = [
   'status', 'submittedAt', 'reviewedAt', 'completedAt', 'createdAt', 'updatedAt',
 ];
 
-function assertCanEditReview(actor, review) {
+function assertCanEditReview(actor, review, action = 'update') {
   if (ELEVATED_ROLES.includes(actor.role)) return;
   const isReviewer = actor._id && actor._id.toString() === review.reviewerId.toString();
   const isReviewee = actor.employeeId && actor.employeeId.toString() === review.employeeId.toString();
   if (isReviewer || isReviewee) return;
-  throw new AppError('You are not authorized to update this review', 403);
+  throw new AppError(`You are not authorized to ${action} this review`, 403);
 }
 
 function sanitizeReviewData(reviewData = {}) {
@@ -79,7 +79,7 @@ exports.getReviews = async (organizationId, query = {}) => {
   };
 };
 
-exports.getReviewById = async (organizationId, reviewId) => {
+exports.getReviewById = async (organizationId, reviewId, actor) => {
   const review = await PerformanceReview.findOne({
     _id: reviewId,
     organizationId
@@ -91,6 +91,11 @@ exports.getReviewById = async (organizationId, reviewId) => {
   if (!review) {
     throw new Error('Performance review not found');
   }
+
+  assertCanEditReview(actor, {
+    reviewerId: review.reviewerId._id || review.reviewerId,
+    employeeId: review.employeeId._id || review.employeeId,
+  }, 'view');
 
   return review;
 };
@@ -196,7 +201,7 @@ exports.deleteReview = async (organizationId, reviewId) => {
   return { success: true, message: 'Performance review deleted' };
 };
 
-exports.submitReview = async (organizationId, reviewId, userId) => {
+exports.submitReview = async (organizationId, reviewId, actor) => {
   const review = await PerformanceReview.findOne({
     _id: reviewId,
     organizationId
@@ -205,6 +210,8 @@ exports.submitReview = async (organizationId, reviewId, userId) => {
   if (!review) {
     throw new Error('Performance review not found');
   }
+
+  assertCanEditReview(actor, review, 'submit');
 
   if (review.status === 'SUBMITTED' || review.status === 'COMPLETED') {
     throw new Error('Review already submitted');

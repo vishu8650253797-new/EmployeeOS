@@ -1,5 +1,8 @@
 const KPI = require('../models/KPI');
 const { getSocketInstance } = require('../socket/socketServer');
+const AppError = require('../utils/AppError');
+
+const ELEVATED_ROLES = ['SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'];
 
 exports.calculateKPIScore = (currentValue, targetValue) => {
   if (!targetValue || targetValue === 0) {
@@ -69,7 +72,7 @@ exports.getKPIs = async (organizationId, query = {}) => {
   };
 };
 
-exports.getKPIById = async (organizationId, kpiId) => {
+exports.getKPIById = async (organizationId, kpiId, actor) => {
   const kpi = await KPI.findOne({
     _id: kpiId,
     organizationId
@@ -80,6 +83,11 @@ exports.getKPIById = async (organizationId, kpiId) => {
 
   if (!kpi) {
     throw new Error('KPI not found');
+  }
+
+  const isOwner = actor.employeeId && actor.employeeId.toString() === kpi.employeeId._id.toString();
+  if (!isOwner && !ELEVATED_ROLES.includes(actor.role)) {
+    throw new AppError('You are not authorized to view this KPI', 403);
   }
 
   return kpi;
@@ -110,9 +118,22 @@ exports.getCycleKPIs = async (organizationId, cycleId) => {
     .populate('employeeId', 'firstName lastName employeeId');
 };
 
+const KPI_UPDATABLE_FIELDS = [
+  'name', 'description', 'category', 'employeeId', 'cycleId', 'targetValue', 'currentValue',
+  'unit', 'weight', 'status',
+];
+
+function pickKpiFields(source) {
+  const picked = {};
+  KPI_UPDATABLE_FIELDS.forEach((field) => {
+    if (source[field] !== undefined) picked[field] = source[field];
+  });
+  return picked;
+}
+
 exports.createKPI = async (organizationId, kpiData, userId) => {
   const kpi = new KPI({
-    ...kpiData,
+    ...pickKpiFields(kpiData),
     organizationId,
     createdBy: userId,
     score: exports.calculateKPIScore(kpiData.currentValue, kpiData.targetValue)
@@ -148,15 +169,16 @@ exports.updateKPI = async (organizationId, kpiId, kpiData) => {
     throw new Error('KPI not found');
   }
 
-  if (kpiData.targetValue !== undefined || kpiData.currentValue !== undefined) {
-    const targetValue = kpiData.targetValue !== undefined ? kpiData.targetValue : kpi.targetValue;
-    const currentValue = kpiData.currentValue !== undefined ? kpiData.currentValue : kpi.currentValue;
-    kpiData.score = exports.calculateKPIScore(currentValue, targetValue);
+  const updates = pickKpiFields(kpiData);
+  if (updates.targetValue !== undefined || updates.currentValue !== undefined) {
+    const targetValue = updates.targetValue !== undefined ? updates.targetValue : kpi.targetValue;
+    const currentValue = updates.currentValue !== undefined ? updates.currentValue : kpi.currentValue;
+    updates.score = exports.calculateKPIScore(currentValue, targetValue);
   }
 
   const updatedKPI = await KPI.findOneAndUpdate(
     { _id: kpiId, organizationId },
-    kpiData,
+    updates,
     { new: true, runValidators: true }
   );
 

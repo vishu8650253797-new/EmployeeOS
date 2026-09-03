@@ -93,10 +93,17 @@ exports.createCycle = async (organizationId, cycleData, userId) => {
   return cycle;
 };
 
+const CYCLE_UPDATABLE_FIELDS = ['name', 'description', 'type', 'startDate', 'endDate', 'status'];
+
 exports.updateCycle = async (organizationId, cycleId, cycleData) => {
+  const updates = {};
+  CYCLE_UPDATABLE_FIELDS.forEach((field) => {
+    if (cycleData[field] !== undefined) updates[field] = cycleData[field];
+  });
+
   const cycle = await PerformanceCycle.findOneAndUpdate(
     { _id: cycleId, organizationId },
-    cycleData,
+    updates,
     { new: true, runValidators: true }
   );
 

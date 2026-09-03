@@ -24,10 +24,11 @@ const notificationSchema = new Schema(
   { timestamps: true }
 );
 
-// Every notification query is scoped by recipient (and organization, implicitly via
-// recipient) — this compound index covers both the unread-count check and the
-// paginated list query without a collection scan as volume grows.
-notificationSchema.index({ organizationId: 1, recipientId: 1, isRead: 1, createdAt: -1 });
+// notificationService queries always filter by recipientId alone (never
+// organizationId — a user belongs to exactly one org, so recipientId is already
+// fully exclusive); recipientId must lead the compound index or Mongo can't use
+// it for the unread-count check or the paginated/sorted list query.
+notificationSchema.index({ recipientId: 1, isRead: 1, createdAt: -1 });
 
 module.exports = model('Notification', notificationSchema);
 module.exports.NOTIFICATION_CATEGORIES = NOTIFICATION_CATEGORIES;

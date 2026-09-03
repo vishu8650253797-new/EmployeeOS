@@ -6,7 +6,7 @@ exports.getGoals = async (req, res) => {
 };
 
 exports.getGoalById = async (req, res) => {
-  const data = await goalService.getGoalById(req.organizationId, req.params.id);
+  const data = await goalService.getGoalById(req.organizationId, req.params.id, req.user);
   res.json({ success: true, data });
 };
 
@@ -51,6 +51,6 @@ exports.updateGoalStatus = async (req, res) => {
 };
 
 exports.getGoalProgressHistory = async (req, res) => {
-  const data = await goalService.getGoalProgressHistory(req.organizationId, req.params.id);
+  const data = await goalService.getGoalProgressHistory(req.organizationId, req.params.id, req.user);
   res.json({ success: true, data });
 };
