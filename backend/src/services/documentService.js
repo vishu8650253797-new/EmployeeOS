@@ -6,7 +6,6 @@ const {
   DocumentRequest,
   Employee,
   User,
-  Notification,
 } = require('../models');
 const AppError = require('../utils/AppError');
 const SOCKET_EVENTS = require('../utils/socketEvents');
@@ -17,6 +16,7 @@ const { validateFile } = require('../utils/fileValidation');
 const { getDocumentExpiryStatus, getDaysUntilExpiry, EXPIRY_WARNING_DAYS_DEFAULT } = require('../utils/documentExpiry');
 const { withTransaction } = require('../utils/withTransaction');
 const auditLogService = require('./auditLogService');
+const notificationService = require('./notificationService');
 
 const ELEVATED_DOC_ROLES = ['SUPER_ADMIN', 'HR_ADMIN'];
 const PREVIEWABLE_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
@@ -103,19 +103,17 @@ async function findHRRecipients(organizationId) {
 }
 
 async function notifyUsers(organizationId, recipients, { type, title, message, entityId }) {
-  const io = getSocketInstance();
   for (const recipient of recipients) {
     const userId = recipient._id.toString();
-    await Notification.create({
-      organizationId: new Types.ObjectId(organizationId),
-      recipientId: new Types.ObjectId(userId),
+    await notificationService.createNotification({
+      organizationId,
+      recipientId: userId,
       type,
       title,
       message,
       entityType: 'EMPLOYEE_DOCUMENT',
       entityId,
     });
-    if (io) io.to(`user:${userId}`).emit(SOCKET_EVENTS.NOTIFICATION_NEW);
   }
 }
 
@@ -499,8 +497,8 @@ async function verifyDocument(organizationId, id, actor, reqMeta = {}) {
 
   const employee = await Employee.findById(doc.employeeId).lean();
   if (employee?.userId) {
-    await Notification.create({
-      organizationId: new Types.ObjectId(organizationId),
+    await notificationService.createNotification({
+      organizationId,
       recipientId: employee.userId,
       type: 'DOCUMENT_VERIFIED',
       title: 'Document verified',
@@ -515,7 +513,6 @@ async function verifyDocument(organizationId, id, actor, reqMeta = {}) {
     io.to(getDocumentRoom(doc._id)).emit(SOCKET_EVENTS.DOCUMENT_VERIFIED, { documentId: doc._id.toString() });
     if (employee?.userId) {
       io.to(`user:${employee.userId.toString()}`).emit(SOCKET_EVENTS.DOCUMENT_VERIFIED, { documentId: doc._id.toString() });
-      io.to(`user:${employee.userId.toString()}`).emit(SOCKET_EVENTS.NOTIFICATION_NEW);
     }
     if (request) {
       io.to(getDocumentRequestRoom(request._id)).emit(SOCKET_EVENTS.DOCUMENT_REQUEST_APPROVED, { requestId: request._id.toString() });
@@ -567,8 +564,8 @@ async function rejectDocument(organizationId, id, actor, rejectionReason, reqMet
 
   const employee = await Employee.findById(doc.employeeId).lean();
   if (employee?.userId) {
-    await Notification.create({
-      organizationId: new Types.ObjectId(organizationId),
+    await notificationService.createNotification({
+      organizationId,
       recipientId: employee.userId,
       type: 'DOCUMENT_REJECTED',
       title: 'Document rejected',
@@ -583,7 +580,6 @@ async function rejectDocument(organizationId, id, actor, rejectionReason, reqMet
     io.to(getDocumentRoom(doc._id)).emit(SOCKET_EVENTS.DOCUMENT_REJECTED, { documentId: doc._id.toString(), rejectionReason: doc.rejectionReason });
     if (employee?.userId) {
       io.to(`user:${employee.userId.toString()}`).emit(SOCKET_EVENTS.DOCUMENT_REJECTED, { documentId: doc._id.toString(), rejectionReason: doc.rejectionReason });
-      io.to(`user:${employee.userId.toString()}`).emit(SOCKET_EVENTS.NOTIFICATION_NEW);
     }
     if (request) {
       io.to(getDocumentRequestRoom(request._id)).emit(SOCKET_EVENTS.DOCUMENT_REQUEST_REJECTED, { requestId: request._id.toString() });

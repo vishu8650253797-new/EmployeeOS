@@ -13,6 +13,7 @@ const SOCKET_EVENTS = {
   CONNECTED: 'connected',
   UNAUTHORIZED: 'unauthorized',
   ERROR: 'error',
+  SESSION_INVALIDATED: 'session:invalidated',
   PROJECT_CREATED: 'project:created',
   PROJECT_UPDATED: 'project:updated',
   PROJECT_DELETED: 'project:deleted',

@@ -1,10 +1,11 @@
 const { Types } = require('mongoose');
-const { LeaveRequest, LeaveType, LeaveBalance, Employee, User, Notification } = require('../models');
+const { LeaveRequest, LeaveType, LeaveBalance, Employee, User } = require('../models');
 const AppError = require('../utils/AppError');
 const { countWorkingDays, hasOverlap } = require('../utils/leaveUtils');
 const SOCKET_EVENTS = require('../utils/socketEvents');
 const { getSocketInstance } = require('../socket/socketServer');
 const leaveBalanceService = require('./leaveBalanceService');
+const notificationService = require('./notificationService');
 
 const CURRENT_YEAR = new Date().getFullYear();
 const ELEVATED_ROLES = ['SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'];
@@ -162,9 +163,9 @@ async function createLeaveRequest(organizationId, payload, actor) {
   const recipients = await findEmployeesToNotify(organizationId, payload.employeeId);
   for (const r of recipients) {
     const userId = r.userId ? r.userId.toString() : r._id.toString();
-    await Notification.create({
-      organizationId: new Types.ObjectId(organizationId),
-      recipientId: new Types.ObjectId(userId),
+    await notificationService.createNotification({
+      organizationId,
+      recipientId: userId,
       type: 'LEAVE_REQUEST_SUBMITTED',
       title: 'New leave request',
       message: `${populated.employeeName} requested ${numberOfDays} ${numberOfDays === 1 ? 'day' : 'days'} of ${populated.leaveType}`,
@@ -172,7 +173,6 @@ async function createLeaveRequest(organizationId, payload, actor) {
       entityId: request._id,
     });
     if (io) {
-      io.to(`user:${userId}`).emit(SOCKET_EVENTS.NOTIFICATION_NEW);
       io.to(`organization:${organizationId}`).emit(SOCKET_EVENTS.LEAVE_REQUEST_CREATED, populated);
       io.to(`organization:${organizationId}`).emit(SOCKET_EVENTS.DASHBOARD_LEAVE_UPDATED, { pendingCount: await LeaveRequest.countDocuments({ organizationId: new Types.ObjectId(organizationId), status: 'PENDING' }) });
     }
@@ -255,14 +255,13 @@ async function approveLeaveRequest(organizationId, id, actor) {
     if (employee && employee.userId) {
       io.to(`user:${employee.userId.toString()}`).emit(SOCKET_EVENTS.LEAVE_REQUEST_APPROVED, populated);
       io.to(`user:${employee.userId.toString()}`).emit(SOCKET_EVENTS.LEAVE_BALANCE_UPDATED);
-      io.to(`user:${employee.userId.toString()}`).emit(SOCKET_EVENTS.NOTIFICATION_NEW);
     }
     io.to(`organization:${organizationId}`).emit(SOCKET_EVENTS.DASHBOARD_LEAVE_UPDATED, { pendingCount: await LeaveRequest.countDocuments({ organizationId: new Types.ObjectId(organizationId), status: 'PENDING' }) });
   }
 
   if (employee && employee.userId) {
-    await Notification.create({
-      organizationId: new Types.ObjectId(organizationId),
+    await notificationService.createNotification({
+      organizationId,
       recipientId: employee.userId,
       type: 'LEAVE_REQUEST_APPROVED',
       title: 'Leave approved',
@@ -303,14 +302,13 @@ async function rejectLeaveRequest(organizationId, id, actor, rejectionReason) {
     if (employee && employee.userId) {
       io.to(`user:${employee.userId.toString()}`).emit(SOCKET_EVENTS.LEAVE_REQUEST_REJECTED, populated);
       io.to(`user:${employee.userId.toString()}`).emit(SOCKET_EVENTS.LEAVE_BALANCE_UPDATED);
-      io.to(`user:${employee.userId.toString()}`).emit(SOCKET_EVENTS.NOTIFICATION_NEW);
     }
     io.to(`organization:${organizationId}`).emit(SOCKET_EVENTS.DASHBOARD_LEAVE_UPDATED, { pendingCount: await LeaveRequest.countDocuments({ organizationId: new Types.ObjectId(organizationId), status: 'PENDING' }) });
   }
 
   if (employee && employee.userId) {
-    await Notification.create({
-      organizationId: new Types.ObjectId(organizationId),
+    await notificationService.createNotification({
+      organizationId,
       recipientId: employee.userId,
       type: 'LEAVE_REQUEST_REJECTED',
       title: 'Leave rejected',
@@ -361,8 +359,8 @@ async function cancelLeaveRequest(organizationId, id, actor) {
   }
 
   if (employee && employee.userId) {
-    await Notification.create({
-      organizationId: new Types.ObjectId(organizationId),
+    await notificationService.createNotification({
+      organizationId,
       recipientId: employee.userId,
       type: 'LEAVE_REQUEST_CANCELLED',
       title: 'Leave cancelled',

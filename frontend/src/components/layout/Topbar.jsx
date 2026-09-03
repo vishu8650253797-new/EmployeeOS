@@ -1,24 +1,29 @@
 import { useNavigate } from 'react-router-dom';
 import { Menu, Search, Bell, HelpCircle, ChevronDown, User, Settings, LogOut } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { notificationService } from '../../services/notificationService';
 import { useSocketEvent } from '../../hooks/useSocket';
 import { SOCKET_EVENTS } from '../../utils/socketEvents';
+import { getNotificationRoute } from '../../utils/notificationRoutes';
 import Avatar from '../ui/Avatar';
 import Dropdown, { DropdownItem, DropdownSeparator } from '../ui/Dropdown';
 import Tooltip from '../ui/Tooltip';
 
+const MAX_NOTIFICATIONS_SHOWN = 20;
+
 export default function Topbar({ onOpenMobileNav }) {
   const { user, logout } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  async function loadNotifications() {
+  const loadNotifications = useCallback(async () => {
     try {
       const [listRes, countRes] = await Promise.all([
-        notificationService.getNotifications({ limit: 20 }),
+        notificationService.getNotifications({ limit: MAX_NOTIFICATIONS_SHOWN }),
         notificationService.getUnreadCount(),
       ]);
       setNotifications(listRes.data || []);
@@ -26,15 +31,30 @@ export default function Topbar({ onOpenMobileNav }) {
     } catch {
       // silently fail; fallback to empty list
     }
-  }
+  }, []);
 
   useEffect(() => {
     loadNotifications();
+  }, [loadNotifications]);
+
+  // Missed events aren't guaranteed over WebSocket — refetch from the persisted,
+  // authoritative source whenever the connection (re)establishes, not just on
+  // first mount, so a dropped connection never leaves the bell stale.
+  useSocketEvent('connect', loadNotifications, [loadNotifications]);
+
+  const handleNewNotification = useCallback((payload) => {
+    setNotifications((prev) => [payload, ...prev].slice(0, MAX_NOTIFICATIONS_SHOWN));
+    setUnreadCount((prev) => prev + 1);
+    toast(payload.title, 'info');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useSocketEvent(SOCKET_EVENTS.NOTIFICATION_NEW, () => loadNotifications(), []);
+  useSocketEvent(SOCKET_EVENTS.NOTIFICATION_NEW, handleNewNotification, [handleNewNotification]);
 
   async function handleMarkAsRead(notification) {
+    const route = getNotificationRoute(notification.entityType, notification.entityId);
+    if (route) navigate(route);
+
     if (notification.isRead) return;
     setNotifications((prev) =>
       prev.map((n) => (n.id === notification.id ? { ...n, isRead: true } : n))

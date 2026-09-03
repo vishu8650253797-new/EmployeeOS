@@ -1,5 +1,5 @@
 const { Types } = require('mongoose');
-const { DocumentRequest, DocumentCategory, Employee, Notification } = require('../models');
+const { DocumentRequest, DocumentCategory, Employee } = require('../models');
 const AppError = require('../utils/AppError');
 const SOCKET_EVENTS = require('../utils/socketEvents');
 const { getSocketInstance } = require('../socket/socketServer');
@@ -7,6 +7,7 @@ const { getDocumentRequestRoom } = require('../socket/socketRooms');
 const auditLogService = require('./auditLogService');
 const documentService = require('./documentService');
 const emailService = require('./emailService');
+const notificationService = require('./notificationService');
 
 const ELEVATED_DOC_ROLES = ['SUPER_ADMIN', 'HR_ADMIN'];
 const OPEN_STATUSES = ['PENDING', 'REJECTED'];
@@ -141,8 +142,8 @@ async function createRequest(organizationId, payload, actor) {
   });
 
   if (employee.userId) {
-    await Notification.create({
-      organizationId: new Types.ObjectId(organizationId),
+    await notificationService.createNotification({
+      organizationId,
       recipientId: employee.userId,
       type: 'DOCUMENT_REQUESTED',
       title: 'New document request',
@@ -163,7 +164,6 @@ async function createRequest(organizationId, payload, actor) {
   if (io) {
     if (employee.userId) {
       io.to(`user:${employee.userId.toString()}`).emit(SOCKET_EVENTS.DOCUMENT_REQUEST_CREATED, { requestId: request._id.toString() });
-      io.to(`user:${employee.userId.toString()}`).emit(SOCKET_EVENTS.NOTIFICATION_NEW);
     }
     io.to(`organization:${organizationId}`).emit(SOCKET_EVENTS.DOCUMENT_REQUEST_CREATED, { requestId: request._id.toString() });
   }

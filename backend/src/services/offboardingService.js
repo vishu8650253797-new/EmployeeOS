@@ -7,7 +7,7 @@ const {
 } = require('../models/Offboarding');
 const AppError = require('../utils/AppError');
 const SOCKET_EVENTS = require('../utils/socketEvents');
-const { getSocketInstance } = require('../socket/socketServer');
+const { getSocketInstance, disconnectUserSockets } = require('../socket/socketServer');
 const { getOrganizationRoom } = require('../socket/socketRooms');
 const { withTransaction } = require('../utils/withTransaction');
 const notificationService = require('./notificationService');
@@ -866,6 +866,11 @@ async function complete(organizationId, id, user, reqMeta = {}) {
     await recordAudit(organizationId, user._id, 'OFFBOARDING_COMPLETED', record._id, { employeeId: record.employeeId.toString() }, reqMeta, session);
     return record;
   });
+
+  const completedEmployee = await Employee.findById(offboarding.employeeId).select('userId').lean();
+  if (completedEmployee?.userId) {
+    disconnectUserSockets(completedEmployee.userId, 'Your account has been deactivated.');
+  }
 
   emitToOrg(organizationId, SOCKET_EVENTS.OFFBOARDING_COMPLETED, { offboardingId: offboarding._id.toString(), employeeId: offboarding.employeeId.toString() });
   await notifyRoles(organizationId, offboardingAccess.FULL_ROLES, 'OFFBOARDING_COMPLETED', 'Offboarding completed',

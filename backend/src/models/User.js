@@ -3,6 +3,21 @@ const bcrypt = require('bcryptjs');
 
 const ROLES = ['SUPER_ADMIN', 'HR_ADMIN', 'MANAGER', 'EMPLOYEE', 'FINANCE', 'IT_ADMIN', 'RECRUITER', 'HIRING_MANAGER', 'INTERVIEWER'];
 const STATUSES = ['active', 'inactive', 'suspended'];
+const NOTIFICATION_CATEGORIES = [
+  'SYSTEM', 'EMPLOYEE', 'RECRUITMENT', 'ONBOARDING', 'ASSET', 'OFFBOARDING',
+  'LEAVE', 'ATTENDANCE', 'APPROVAL', 'SECURITY', 'ANNOUNCEMENT',
+];
+
+// Per-category opt-out for in-app notifications. Missing/undefined for a
+// category means "enabled" — this is an opt-out model, so existing users and
+// every current notification call site keep working unchanged by default.
+const notificationPreferencesSchema = new Schema(
+  NOTIFICATION_CATEGORIES.reduce((fields, category) => {
+    fields[category] = { type: Boolean, default: true };
+    return fields;
+  }, {}),
+  { _id: false }
+);
 
 const userSchema = new Schema(
   {
@@ -19,6 +34,7 @@ const userSchema = new Schema(
     jobTitle: { type: String, trim: true },
     status: { type: String, enum: STATUSES, default: 'active' },
     lastLogin: { type: Date },
+    notificationPreferences: { type: notificationPreferencesSchema, default: () => ({}) },
     refreshToken: { type: String, select: false },
     resetPasswordToken: { type: String, select: false },
     resetPasswordExpires: { type: Date, select: false },
@@ -50,3 +66,6 @@ userSchema.set('toJSON', {
 });
 
 module.exports = model('User', userSchema);
+module.exports.ROLES = ROLES;
+module.exports.STATUSES = STATUSES;
+module.exports.NOTIFICATION_CATEGORIES = NOTIFICATION_CATEGORIES;

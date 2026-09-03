@@ -1,10 +1,10 @@
-const { Types } = require('mongoose');
-const { EmployeeDocument, Employee, User, Notification } = require('../models');
+const { EmployeeDocument, Employee, User } = require('../models');
 const SOCKET_EVENTS = require('../utils/socketEvents');
 const { getSocketInstance } = require('../socket/socketServer');
 const { getDocumentRoom } = require('../socket/socketRooms');
 const { REMINDER_THRESHOLDS_DAYS } = require('../utils/documentExpiry');
 const auditLogService = require('./auditLogService');
+const notificationService = require('./notificationService');
 
 async function notifyEmployeeAndHR(document, { type, title, message }) {
   const employee = await Employee.findById(document.employeeId).lean();
@@ -21,16 +21,15 @@ async function notifyEmployeeAndHR(document, { type, title, message }) {
   hrUsers.forEach((u) => recipientUserIds.add(u._id.toString()));
 
   for (const userId of recipientUserIds) {
-    await Notification.create({
+    await notificationService.createNotification({
       organizationId: document.organizationId,
-      recipientId: new Types.ObjectId(userId),
+      recipientId: userId,
       type,
       title,
       message,
       entityType: 'EMPLOYEE_DOCUMENT',
       entityId: document._id,
     });
-    if (io) io.to(`user:${userId}`).emit(SOCKET_EVENTS.NOTIFICATION_NEW);
   }
 
   if (io) {

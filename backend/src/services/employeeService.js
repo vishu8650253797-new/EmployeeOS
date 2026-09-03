@@ -5,6 +5,9 @@ const { withTransaction } = require('../utils/withTransaction');
 const auditLogService = require('./auditLogService');
 const storageService = require('./storage');
 const { getExtension, matchesFileSignature, EXTENSION_MIME_MAP } = require('../utils/fileValidation');
+const { disconnectUserSockets } = require('../socket/socketServer');
+
+const DEACTIVATED_STATUSES = ['INACTIVE', 'SUSPENDED'];
 
 const DEFAULTS = { page: 1, limit: 10, sortBy: 'createdAt', sortOrder: 'desc' };
 const ELEVATED_ROLES = ['SUPER_ADMIN', 'HR_ADMIN'];
@@ -187,8 +190,17 @@ async function updateEmployee(organizationId, id, payload) {
   if (updates.address) updates.location = buildLocation(updates.address);
   else if (updates.location === undefined && existing.location) updates.location = existing.location;
 
+  const previousStatus = existing.status;
   Object.assign(existing, updates);
   await existing.save();
+
+  // The real-time channel must not keep granting access on a stale session once
+  // an employee is suspended/deactivated — cut their live socket(s) immediately
+  // rather than waiting for the access token to expire naturally.
+  if (existing.userId && DEACTIVATED_STATUSES.includes(existing.status) && existing.status !== previousStatus) {
+    disconnectUserSockets(existing.userId, 'Your account has been deactivated.');
+  }
+
   return getEmployeeById(organizationId, existing._id);
 }
 
@@ -203,6 +215,11 @@ async function deleteEmployee(organizationId, id) {
   employee.isDeleted = true;
   employee.status = 'INACTIVE';
   await employee.save();
+
+  if (employee.userId) {
+    disconnectUserSockets(employee.userId, 'Your account has been deactivated.');
+  }
+
   return { success: true, message: 'Employee removed successfully' };
 }
 

@@ -3,6 +3,7 @@ const { Organization, User } = require('../models');
 const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/generateTokens');
 const { AppError } = require('../middleware/errorMiddleware');
 const emailService = require('./emailService');
+const { disconnectUserSockets } = require('../socket/socketServer');
 
 const RESET_TOKEN_TTL_MS = 30 * 60 * 1000; // 30 minutes, matches the frontend's messaging
 
@@ -105,6 +106,7 @@ async function refresh(refreshToken) {
 
 async function logout(userId) {
   await User.findByIdAndUpdate(userId, { refreshToken: null });
+  disconnectUserSockets(userId, 'You have been signed out.');
 }
 
 async function getCurrentUser(userId) {
@@ -143,6 +145,7 @@ async function resetPassword(token, newPassword) {
   user.resetPasswordExpires = undefined;
   user.refreshToken = null; // invalidate existing sessions
   await user.save();
+  disconnectUserSockets(user._id, 'Your password was changed. Please sign in again.');
 
   return { success: true };
 }
