@@ -27,6 +27,7 @@ const recruitmentRoutes = require('./recruitmentRoutes');
 const publicJobRoutes = require('./publicJobRoutes');
 const onboardingTemplateRoutes = require('./onboardingTemplateRoutes');
 const onboardingRoutes = require('./onboardingRoutes');
+const offboardingRoutes = require('./offboardingRoutes');
 const assetCategoryRoutes = require('./assetCategoryRoutes');
 const assetVendorRoutes = require('./assetVendorRoutes');
 const assetRequestRoutes = require('./assetRequestRoutes');
@@ -68,6 +69,7 @@ router.use('/recruitment', recruitmentRoutes);
 router.use('/public', publicJobRoutes);
 router.use('/onboarding-templates', onboardingTemplateRoutes);
 router.use('/onboarding', onboardingRoutes);
+router.use('/offboarding', offboardingRoutes);
 
 // Order matters: these literal sub-paths are registered before the generic
 // /assets router below, so they're matched first instead of falling through

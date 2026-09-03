@@ -59,6 +59,10 @@ const AssetRequests = lazy(() => import('./pages/assets/AssetRequests'));
 const AssetMaintenance = lazy(() => import('./pages/assets/AssetMaintenance'));
 const AssetAnalytics = lazy(() => import('./pages/assets/AssetAnalytics'));
 
+// Offboarding pages
+const OffboardingList = lazy(() => import('./pages/offboarding/OffboardingList'));
+const OffboardingDetails = lazy(() => import('./pages/offboarding/OffboardingDetails'));
+
 // Recruitment pages
 const RecruitmentDashboard = lazy(() => import('./pages/recruitment/RecruitmentDashboard'));
 const JobList = lazy(() => import('./pages/recruitment/JobList'));
@@ -166,6 +170,9 @@ export default function App() {
                   <Route path="/assets/analytics" element={<AssetAnalytics />} />
                   <Route path="/assets/:id" element={<AssetDetails />} />
                   <Route path="/assets/:id/edit" element={<AssetForm />} />
+
+                  <Route path="/offboarding" element={<OffboardingList />} />
+                  <Route path="/offboarding/:id" element={<OffboardingDetails />} />
 
                   <Route path="/recruitment" element={<RecruitmentDashboard />} />
                   <Route path="/recruitment/jobs" element={<JobList />} />

@@ -28,6 +28,7 @@ import {
   Package,
   Truck,
   Wrench,
+  LogOut,
 } from 'lucide-react';
 
 // Sidebar navigation. Later, filter sections/items by role permissions.
@@ -77,6 +78,12 @@ export const NAV_SECTIONS = [
       { label: 'Requests', to: '/assets/requests', icon: ClipboardList },
       { label: 'Maintenance', to: '/assets/maintenance', icon: Wrench },
       { label: 'Analytics', to: '/assets/analytics', icon: BarChart2 },
+    ],
+  },
+  {
+    title: 'Offboarding',
+    items: [
+      { label: 'Offboarding', to: '/offboarding', icon: LogOut },
     ],
   },
   {

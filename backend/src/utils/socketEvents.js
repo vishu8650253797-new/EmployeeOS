@@ -113,6 +113,17 @@ const SOCKET_EVENTS = {
   ASSET_MAINTENANCE_COMPLETED: 'asset:maintenanceCompleted',
   ASSET_VENDOR_CREATED: 'asset:vendorCreated',
   ASSET_VENDOR_UPDATED: 'asset:vendorUpdated',
+  OFFBOARDING_CREATED: 'offboarding:created',
+  OFFBOARDING_UPDATED: 'offboarding:updated',
+  OFFBOARDING_APPROVED: 'offboarding:approved',
+  OFFBOARDING_REJECTED: 'offboarding:rejected',
+  OFFBOARDING_CANCELLED: 'offboarding:cancelled',
+  OFFBOARDING_CLEARANCE_UPDATED: 'offboarding:clearance-updated',
+  OFFBOARDING_ASSET_CLEARANCE_UPDATED: 'offboarding:asset-clearance-updated',
+  OFFBOARDING_EXIT_INTERVIEW_UPDATED: 'offboarding:exit-interview-updated',
+  OFFBOARDING_ACCESS_UPDATED: 'offboarding:access-updated',
+  OFFBOARDING_KNOWLEDGE_TRANSFER_UPDATED: 'offboarding:knowledge-transfer-updated',
+  OFFBOARDING_COMPLETED: 'offboarding:completed',
 };
 
 module.exports = SOCKET_EVENTS;

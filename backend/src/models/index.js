@@ -37,4 +37,5 @@ module.exports = {
   AssetHistory: require('./AssetHistory'),
   AssetRequest: require('./AssetRequest'),
   AssetMaintenance: require('./AssetMaintenance'),
+  Offboarding: require('./Offboarding'),
 };

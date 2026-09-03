@@ -62,6 +62,28 @@ export const STATUS_TONES = {
   EXPIRING_SOON: 'warning',
   EXPIRED: 'danger',
   NONE: 'neutral',
+  // Offboarding lifecycle statuses
+  DRAFT: 'neutral',
+  INITIATED: 'info',
+  PENDING_APPROVAL: 'warning',
+  NOTICE_PERIOD: 'brand',
+  CLEARANCE_IN_PROGRESS: 'warning',
+  FINAL_REVIEW: 'info',
+  // Offboarding approval / clearance sub-statuses
+  MANAGER_APPROVED: 'info',
+  NOT_STARTED: 'neutral',
+  CLEARED: 'success',
+  BLOCKED: 'danger',
+  // Asset / document clearance aggregate statuses
+  NOT_APPLICABLE: 'neutral',
+  PARTIAL: 'warning',
+  // Exit interview / access deactivation / knowledge transfer statuses
+  NOT_SCHEDULED: 'neutral',
+  SCHEDULED: 'info',
+  WAIVED: 'neutral',
+  DEACTIVATED: 'success',
+  FAILED: 'danger',
+  NOT_REQUIRED: 'neutral',
 };
 
 export const PRIORITY_TONES = {
