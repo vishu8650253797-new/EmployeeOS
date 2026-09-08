@@ -49,8 +49,8 @@ export default function CandidateDetail() {
         applicationService.getApplications({ candidateId: id }),
         interviewService.getInterviews({ candidateId: id }),
         offerService.getOffers({ candidateId: id }),
-        candidateService.getCandidateNotes(id),
-        candidateService.getCandidateActivities(id),
+        candidateService.getNotes(id),
+        candidateService.getActivities(id),
         departmentService.getDepartments(),
       ]);
       setCandidate(candidateRes);
@@ -79,7 +79,7 @@ export default function CandidateDetail() {
 
   const handleAssignRecruiter = async (recruiterId) => {
     try {
-      await candidateService.assignRecruiter(id, { recruiterId });
+      await candidateService.assignRecruiter(id, recruiterId);
       toast.success('Recruiter assigned');
       loadData();
     } catch (err) {
@@ -90,7 +90,7 @@ export default function CandidateDetail() {
   const handleAddNote = async (e) => {
     e.preventDefault();
     try {
-      await candidateService.addCandidateNote(id, { content: noteContent, isPrivate: noteIsPrivate });
+      await candidateService.createNote(id, { content: noteContent, isPrivate: noteIsPrivate });
       toast.success('Note added');
       setNoteContent('');
       setNoteIsPrivate(false);
