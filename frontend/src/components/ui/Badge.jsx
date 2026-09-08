@@ -84,6 +84,15 @@ export const STATUS_TONES = {
   DEACTIVATED: 'success',
   FAILED: 'danger',
   NOT_REQUIRED: 'neutral',
+  // Payroll run / period / compensation statuses (DRAFT, CANCELLED, ACTIVE,
+  // APPROVED, REJECTED, FAILED reuse the tones mapped above).
+  PROCESSING: 'info',
+  CALCULATED: 'brand',
+  SUBMITTED: 'warning',
+  FINALIZED: 'success',
+  CLOSED: 'neutral',
+  ADJUSTED: 'warning',
+  SUPERSEDED: 'neutral',
 };
 
 export const PRIORITY_TONES = {

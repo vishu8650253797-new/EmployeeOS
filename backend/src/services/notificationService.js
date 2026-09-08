@@ -27,6 +27,9 @@ const ENTITY_TYPE_CATEGORIES = {
   LEAVE_REQUEST: 'LEAVE',
   EMPLOYEE_DOCUMENT: 'SYSTEM',
   DOCUMENT_REQUEST: 'SYSTEM',
+  PayrollRun: 'PAYROLL',
+  PayrollRecord: 'PAYROLL',
+  EmployeeCompensation: 'PAYROLL',
 };
 
 function deriveCategory(entityType) {

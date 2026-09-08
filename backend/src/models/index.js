@@ -38,4 +38,10 @@ module.exports = {
   AssetRequest: require('./AssetRequest'),
   AssetMaintenance: require('./AssetMaintenance'),
   Offboarding: require('./Offboarding'),
+  SalaryComponent: require('./SalaryComponent'),
+  SalaryStructure: require('./SalaryStructure'),
+  EmployeeCompensation: require('./EmployeeCompensation'),
+  PayrollPeriod: require('./PayrollPeriod'),
+  PayrollRun: require('./PayrollRun'),
+  PayrollRecord: require('./PayrollRecord'),
 };

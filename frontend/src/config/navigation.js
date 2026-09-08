@@ -66,6 +66,7 @@ export const NAV_SECTIONS = [
     items: [
       { label: 'Documents', to: '/documents', icon: FolderOpen },
       { label: 'Payroll', to: '/payroll', icon: Wallet },
+      { label: 'My Payslips', to: '/my-payslips', icon: Wallet },
       { label: 'Reports', to: '/reports', icon: BarChart3 },
     ],
   },

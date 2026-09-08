@@ -33,6 +33,21 @@ export function formatCurrency(amount) {
   }).format(amount);
 }
 
+// Payroll amounts are returned by the API as integer minor units (paise),
+// not the major-unit numbers formatCurrency() above expects (built for
+// whole-rupee fields like Asset.purchasePrice) — using formatCurrency() on a
+// minor-units value would render 100x too large, so this is a separate,
+// additive function rather than a change to formatCurrency().
+export function formatCurrencyFromMinorUnits(amountMinorUnits, currency = 'INR') {
+  if (amountMinorUnits == null) return '—';
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amountMinorUnits / 100);
+}
+
 export function formatDateForInput(date) {
   if (!date) return '';
   const d = new Date(date);

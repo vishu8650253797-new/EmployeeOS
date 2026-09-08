@@ -14,6 +14,9 @@ const ROUTE_BUILDERS = {
   Candidate: (id) => `/recruitment/candidates/${id}`,
   Interview: (id) => `/recruitment/interviews/${id}`,
   JobOffer: (id) => `/recruitment/offers/${id}`,
+  PayrollRun: (id) => `/payroll/runs/${id}`,
+  PayrollRecord: (id) => `/my-payslips/${id}`,
+  EmployeeCompensation: () => '/payroll/compensation',
 };
 
 export function getNotificationRoute(entityType, entityId) {

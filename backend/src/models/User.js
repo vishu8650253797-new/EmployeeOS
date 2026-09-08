@@ -5,7 +5,7 @@ const ROLES = ['SUPER_ADMIN', 'HR_ADMIN', 'MANAGER', 'EMPLOYEE', 'FINANCE', 'IT_
 const STATUSES = ['active', 'inactive', 'suspended'];
 const NOTIFICATION_CATEGORIES = [
   'SYSTEM', 'EMPLOYEE', 'RECRUITMENT', 'ONBOARDING', 'ASSET', 'OFFBOARDING',
-  'LEAVE', 'ATTENDANCE', 'APPROVAL', 'SECURITY', 'ANNOUNCEMENT',
+  'LEAVE', 'ATTENDANCE', 'APPROVAL', 'SECURITY', 'ANNOUNCEMENT', 'PAYROLL',
 ];
 
 // Per-category opt-out for in-app notifications. Missing/undefined for a

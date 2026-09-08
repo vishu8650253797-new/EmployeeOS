@@ -86,6 +86,20 @@ const ApplicationFormPage = lazy(() => import('./pages/careers/ApplicationFormPa
 const ApplicationSuccessPage = lazy(() => import('./pages/careers/ApplicationSuccessPage'));
 const OfferResponsePage = lazy(() => import('./pages/careers/OfferResponsePage'));
 
+// Payroll pages
+const PayrollDashboard = lazy(() => import('./pages/payroll/PayrollDashboard'));
+const PayrollRunList = lazy(() => import('./pages/payroll/PayrollRunList'));
+const PayrollRunForm = lazy(() => import('./pages/payroll/PayrollRunForm'));
+const PayrollRunDetails = lazy(() => import('./pages/payroll/PayrollRunDetails'));
+const PayrollRecordDetails = lazy(() => import('./pages/payroll/PayrollRecordDetails'));
+const SalaryComponents = lazy(() => import('./pages/payroll/SalaryComponents'));
+const SalaryStructures = lazy(() => import('./pages/payroll/SalaryStructures'));
+const SalaryStructureForm = lazy(() => import('./pages/payroll/SalaryStructureForm'));
+const EmployeeCompensationHistory = lazy(() => import('./pages/payroll/EmployeeCompensationHistory'));
+const PayrollPeriods = lazy(() => import('./pages/payroll/PayrollPeriods'));
+const PayrollAnalytics = lazy(() => import('./pages/payroll/PayrollAnalytics'));
+const MyPayslips = lazy(() => import('./pages/payroll/MyPayslips'));
+
 const ComingSoon = lazy(() => import('./pages/misc/ComingSoon'));
 const NotFound = lazy(() => import('./pages/misc/NotFound'));
 
@@ -195,7 +209,22 @@ export default function App() {
                   <Route path="/recruitment/analytics" element={<RecruitmentAnalytics />} />
 
                   <Route path="/tasks" element={<ComingSoon title="Tasks" />} />
-                  <Route path="/payroll" element={<ComingSoon title="Payroll" />} />
+
+                  <Route path="/payroll" element={<PayrollDashboard />} />
+                  <Route path="/payroll/runs" element={<PayrollRunList />} />
+                  <Route path="/payroll/runs/new" element={<PayrollRunForm />} />
+                  <Route path="/payroll/runs/:id" element={<PayrollRunDetails />} />
+                  <Route path="/payroll/runs/:id/records/:recordId" element={<PayrollRecordDetails />} />
+                  <Route path="/payroll/components" element={<SalaryComponents />} />
+                  <Route path="/payroll/structures" element={<SalaryStructures />} />
+                  <Route path="/payroll/structures/new" element={<SalaryStructureForm />} />
+                  <Route path="/payroll/structures/:id/edit" element={<SalaryStructureForm />} />
+                  <Route path="/payroll/compensation" element={<EmployeeCompensationHistory />} />
+                  <Route path="/payroll/periods" element={<PayrollPeriods />} />
+                  <Route path="/payroll/analytics" element={<PayrollAnalytics />} />
+                  <Route path="/my-payslips" element={<MyPayslips />} />
+                  <Route path="/my-payslips/:id" element={<MyPayslips />} />
+
                   <Route path="/reports" element={<ComingSoon title="Reports" />} />
                   <Route path="/settings" element={<ComingSoon title="Settings" />} />
                   <Route path="/support" element={<ComingSoon title="Help & Support" />} />

@@ -34,6 +34,13 @@ const assetRequestRoutes = require('./assetRequestRoutes');
 const assetMaintenanceRoutes = require('./assetMaintenanceRoutes');
 const assetAnalyticsRoutes = require('./assetAnalyticsRoutes');
 const assetRoutes = require('./assetRoutes');
+const salaryComponentRoutes = require('./salaryComponentRoutes');
+const salaryStructureRoutes = require('./salaryStructureRoutes');
+const employeeCompensationRoutes = require('./employeeCompensationRoutes');
+const payrollPeriodRoutes = require('./payrollPeriodRoutes');
+const payrollRunRoutes = require('./payrollRunRoutes');
+const payslipRoutes = require('./payslipRoutes');
+const payrollAnalyticsRoutes = require('./payrollAnalyticsRoutes');
 
 const router = Router();
 
@@ -81,5 +88,13 @@ router.use('/assets/requests', assetRequestRoutes);
 router.use('/assets/maintenance', assetMaintenanceRoutes);
 router.use('/assets/analytics', assetAnalyticsRoutes);
 router.use('/assets', assetRoutes);
+
+router.use('/payroll/components', salaryComponentRoutes);
+router.use('/payroll/structures', salaryStructureRoutes);
+router.use('/payroll/compensation', employeeCompensationRoutes);
+router.use('/payroll/periods', payrollPeriodRoutes);
+router.use('/payroll/runs', payrollRunRoutes);
+router.use('/payroll/payslips', payslipRoutes);
+router.use('/payroll/analytics', payrollAnalyticsRoutes);
 
 module.exports = router;

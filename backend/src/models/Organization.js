@@ -19,6 +19,11 @@ const organizationSchema = new Schema(
       lateThresholdMinutes: { type: Number, default: 15, min: 0 },
       minimumWorkingMinutes: { type: Number, default: 240, min: 0 },
     },
+    payrollSettings: {
+      defaultCurrency: { type: String, trim: true, uppercase: true, default: 'INR' },
+      payFrequency: { type: String, enum: ['MONTHLY'], default: 'MONTHLY' },
+      payDayOfMonth: { type: Number, min: 1, max: 31, default: 1 },
+    },
   },
   { timestamps: true }
 );
