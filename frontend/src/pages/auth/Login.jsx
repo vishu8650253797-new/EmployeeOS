@@ -101,15 +101,6 @@ export default function Login() {
           {loading ? 'Signing in…' : 'Sign in'}
         </Button>
       </form>
-
-      <div className="mt-6 rounded-lg border border-line bg-canvas p-3.5 text-[13px] text-ink-500">
-        <p className="font-medium text-ink-700">Dev account</p>
-        <p className="mt-1">
-          Start backend with <code className="rounded bg-surface px-1 text-ink-700">SEED_ADMIN=true</code>, then sign in with{' '}
-          <span className="font-medium text-ink-700">admin@employeeos.io</span> /{' '}
-          <span className="font-medium text-ink-700">Password123</span>.
-        </p>
-      </div>
     </div>
   );
 }
