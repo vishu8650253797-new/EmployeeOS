@@ -14,6 +14,23 @@ const emergencyContactSchema = new Schema(
   { _id: false }
 );
 
+// Plural, ESS-owned emergency contact list (Step 12B) — deliberately a
+// separate field from the legacy singular `emergencyContact` above rather
+// than a migration of it. The singular field is still set by HR via the
+// admin EmployeeForm and displayed on the admin EmployeeProfile page;
+// changing its shape there is out of scope for this step. Each entry gets
+// its own _id so the employee can edit/remove a specific contact.
+const emergencyContactEntrySchema = new Schema(
+  {
+    name: { type: String, required: true, trim: true },
+    relationship: { type: String, required: true, trim: true },
+    phone: { type: String, required: true, trim: true },
+    alternatePhone: { type: String, trim: true },
+    email: { type: String, trim: true, lowercase: true },
+  },
+  { timestamps: true }
+);
+
 const addressSchema = new Schema(
   {
     street: { type: String, trim: true },
@@ -61,6 +78,10 @@ const employeeSchema = new Schema(
     lastName: { type: String, required: true, trim: true },
     email: { type: String, required: true, lowercase: true, trim: true },
     phone: { type: String, trim: true },
+    // Employee-editable via ESS (Step 12B) — distinct from both the login
+    // email (User.email) and the work email above (`email`, HR-controlled).
+    personalEmail: { type: String, trim: true, lowercase: true },
+    alternatePhone: { type: String, trim: true },
     avatar: { type: String },
     departmentId: { type: Schema.Types.ObjectId, ref: 'Department', index: true },
     jobTitle: { type: String, required: true, trim: true },
@@ -75,6 +96,7 @@ const employeeSchema = new Schema(
     address: { type: addressSchema, default: {} },
     location: { type: String, trim: true },
     emergencyContact: { type: emergencyContactSchema, default: {} },
+    emergencyContacts: { type: [emergencyContactEntrySchema], default: [] },
     bankDetails: { type: bankDetailsSchema, default: {} },
     taxInfo: { type: taxInfoSchema, default: {} },
     avatarStorageKey: { type: String, select: false },

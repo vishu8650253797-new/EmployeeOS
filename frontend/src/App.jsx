@@ -15,6 +15,12 @@ const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'));
 
 // App pages
 const Dashboard = lazy(() => import('./pages/dashboard/Dashboard'));
+const EssDashboard = lazy(() => import('./pages/ess/EssDashboard'));
+const EssProfile = lazy(() => import('./pages/ess/EssProfile'));
+const EssLeave = lazy(() => import('./pages/ess/EssLeave'));
+const EssLeaveHistory = lazy(() => import('./pages/ess/EssLeaveHistory'));
+const EssLeaveDetail = lazy(() => import('./pages/ess/EssLeaveDetail'));
+const EssAttendance = lazy(() => import('./pages/ess/EssAttendance'));
 const EmployeeList = lazy(() => import('./pages/employees/EmployeeList'));
 const EmployeeForm = lazy(() => import('./pages/employees/EmployeeForm'));
 const EmployeeProfile = lazy(() => import('./pages/employees/EmployeeProfile'));
@@ -129,6 +135,13 @@ export default function App() {
               <Route element={<ProtectedRoute />}>
                 <Route element={<AppLayout />}>
                   <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/ess" element={<EssDashboard />} />
+                  <Route path="/ess/dashboard" element={<EssDashboard />} />
+                  <Route path="/ess/profile" element={<EssProfile />} />
+                  <Route path="/ess/leave" element={<EssLeave />} />
+                  <Route path="/ess/leave/history" element={<EssLeaveHistory />} />
+                  <Route path="/ess/leave/:id" element={<EssLeaveDetail />} />
+                  <Route path="/ess/attendance" element={<EssAttendance />} />
 
                   <Route path="/employees" element={<EmployeeList />} />
                   <Route path="/employees/new" element={<EmployeeForm />} />

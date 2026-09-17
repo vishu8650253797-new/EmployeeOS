@@ -268,6 +268,11 @@ async function getLeaveRequests(organizationId, filters = {}, actor) {
   };
 }
 
+// Pagination and the extra filters (leaveTypeId/date range) are opt-in: when
+// neither `page` nor `limit` is passed, this returns every matching request
+// exactly as before (the existing /leave-requests/my consumer relies on
+// that), so extending it here for the ESS leave history view (Step 12C,
+// which always passes page/limit) doesn't change behavior for anyone else.
 async function getMyLeaveRequests(organizationId, employeeId, filters = {}) {
   const query = {
     organizationId: new Types.ObjectId(organizationId),
@@ -276,9 +281,33 @@ async function getMyLeaveRequests(organizationId, employeeId, filters = {}) {
   if (filters.status && ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'].includes(filters.status)) {
     query.status = filters.status;
   }
-  const data = await LeaveRequest.find(query).sort({ createdAt: -1 }).lean();
-  const populated = await populateRequests(data);
-  return { data: populated };
+  if (filters.leaveTypeId && Types.ObjectId.isValid(filters.leaveTypeId)) {
+    query.leaveTypeId = new Types.ObjectId(filters.leaveTypeId);
+  }
+  if (filters.startDate || filters.endDate) {
+    query.startDate = {};
+    if (filters.startDate) query.startDate.$gte = new Date(filters.startDate);
+    if (filters.endDate) query.startDate.$lte = new Date(filters.endDate);
+  }
+
+  const wantsPagination = filters.page !== undefined || filters.limit !== undefined;
+  let cursor = LeaveRequest.find(query).sort({ createdAt: -1 });
+
+  if (!wantsPagination) {
+    const data = await cursor.lean();
+    return { data: await populateRequests(data) };
+  }
+
+  const pageNum = Math.max(parseInt(filters.page, 10) || 1, 1);
+  const limitNum = Math.min(Math.max(parseInt(filters.limit, 10) || 20, 1), 100);
+  const [data, total] = await Promise.all([
+    cursor.skip((pageNum - 1) * limitNum).limit(limitNum).lean(),
+    LeaveRequest.countDocuments(query),
+  ]);
+  return {
+    data: await populateRequests(data),
+    pagination: { page: pageNum, limit: limitNum, total, totalPages: Math.ceil(total / limitNum) },
+  };
 }
 
 async function getLeaveRequestById(organizationId, id, actor) {

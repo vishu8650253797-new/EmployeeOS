@@ -135,6 +135,7 @@ const SOCKET_EVENTS = {
   PAYROLL_RUN_CANCELLED: 'payroll:runCancelled',
   PAYROLL_STRUCTURE_UPDATED: 'payroll:structureUpdated',
   PAYROLL_COMPENSATION_UPDATED: 'payroll:compensationUpdated',
+  EMPLOYEE_PROFILE_UPDATED: 'employee:profileUpdated',
 };
 
 module.exports = SOCKET_EVENTS;

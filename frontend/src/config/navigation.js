@@ -29,6 +29,7 @@ import {
   Truck,
   Wrench,
   LogOut,
+  UserRound,
 } from 'lucide-react';
 
 // Sidebar navigation. Later, filter sections/items by role permissions.
@@ -38,6 +39,7 @@ export const NAV_SECTIONS = [
     title: 'Workspace',
     items: [
       { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
+      { label: 'My Workspace', to: '/ess', icon: UserRound },
       { label: 'Employees', to: '/employees', icon: Users },
       { label: 'Departments', to: '/departments', icon: Building2 },
     ],
