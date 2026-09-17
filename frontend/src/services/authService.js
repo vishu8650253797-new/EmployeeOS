@@ -48,6 +48,13 @@ export const authService = {
     return user;
   },
 
+  async googleAuth(idToken) {
+    const response = await publicApi.post('/auth/google', { idToken });
+    const user = normalizeUser(response.data);
+    this.setAccessToken(response.data.accessToken);
+    return { user, isNewUser: Boolean(response.data.isNewUser) };
+  },
+
   async forgotPassword(email) {
     const response = await publicApi.post('/auth/forgot-password', { email });
     return response.data;

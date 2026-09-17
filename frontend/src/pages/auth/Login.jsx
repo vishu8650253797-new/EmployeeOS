@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
+import GoogleSignInButton from '../../components/auth/GoogleSignInButton';
 
 export default function Login() {
   const { login } = useAuth();
@@ -101,6 +102,18 @@ export default function Login() {
           {loading ? 'Signing in…' : 'Sign in'}
         </Button>
       </form>
+
+      {Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID) && (
+        <>
+          <div className="my-5 flex items-center gap-3">
+            <div className="h-px flex-1 bg-line" />
+            <span className="text-xs text-ink-400">or</span>
+            <div className="h-px flex-1 bg-line" />
+          </div>
+
+          <GoogleSignInButton />
+        </>
+      )}
     </div>
   );
 }

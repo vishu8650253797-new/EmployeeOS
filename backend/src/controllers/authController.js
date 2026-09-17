@@ -86,6 +86,27 @@ exports.login = async (req, res, next) => {
   }
 };
 
+exports.googleAuth = async (req, res, next) => {
+  try {
+    handleValidationErrors(req);
+    const { user, accessToken, refreshToken, isNewUser } = await authService.googleAuth(req.body.idToken);
+
+    res.cookie(ACCESS_COOKIE_NAME, accessToken, { ...cookieOptions, maxAge: 15 * 60 * 1000 });
+    res.cookie(REFRESH_COOKIE_NAME, refreshToken, { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.cookie(SESSION_COOKIE_NAME, '1', { ...sessionCookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 });
+
+    res.status(isNewUser ? 201 : 200).json({
+      success: true,
+      message: isNewUser ? 'Account created' : 'Login successful',
+      user,
+      accessToken,
+      isNewUser,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.refresh = async (req, res, next) => {
   try {
     const refreshToken = req.cookies[REFRESH_COOKIE_NAME] || req.body.refreshToken;

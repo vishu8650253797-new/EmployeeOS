@@ -20,6 +20,10 @@ const loginValidator = [
   body('password').notEmpty().withMessage('Password is required'),
 ];
 
+const googleAuthValidator = [
+  body('idToken').trim().notEmpty().withMessage('Google ID token is required'),
+];
+
 const forgotPasswordValidator = [
   body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
 ];
@@ -35,4 +39,6 @@ const resetPasswordValidator = [
     .withMessage('Password must contain at least one letter'),
 ];
 
-module.exports = { registerValidator, loginValidator, forgotPasswordValidator, resetPasswordValidator };
+module.exports = {
+  registerValidator, loginValidator, googleAuthValidator, forgotPasswordValidator, resetPasswordValidator,
+};

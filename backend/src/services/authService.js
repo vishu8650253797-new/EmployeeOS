@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { OAuth2Client } = require('google-auth-library');
 const { Organization, User } = require('../models');
 const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/generateTokens');
 const { AppError } = require('../middleware/errorMiddleware');
@@ -6,6 +7,8 @@ const emailService = require('./emailService');
 const { disconnectUserSockets } = require('../socket/socketServer');
 
 const RESET_TOKEN_TTL_MS = 30 * 60 * 1000; // 30 minutes, matches the frontend's messaging
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 function hashToken(token) {
   return crypto.createHash('sha256').update(token).digest('hex');
@@ -45,6 +48,89 @@ async function register({ firstName, lastName, email, password, organizationName
   await user.save();
 
   return { user: sanitizeUser(user), accessToken, refreshToken, organization };
+}
+
+// Verifies a Google ID token and either signs in an existing account (found
+// by googleId, then by verified email — linking Google to a pre-existing
+// local account without touching its password) or creates a brand-new
+// organization + user, mirroring register()'s "one signup = one new
+// organization" pattern exactly, with Google as the verified identity
+// source instead of a chosen password.
+async function googleAuth(idToken) {
+  if (!idToken) throw new AppError('Google ID token is required', 400);
+
+  let payload;
+  try {
+    const ticket = await googleClient.verifyIdToken({ idToken, audience: process.env.GOOGLE_CLIENT_ID });
+    payload = ticket.getPayload();
+  } catch {
+    throw new AppError('Invalid Google credential', 401);
+  }
+
+  // Only Google-verified emails may be trusted to link/create an account —
+  // otherwise an attacker could register an unverified address matching a
+  // victim's email and hijack their account via the linking path below.
+  if (!payload || !payload.email_verified) {
+    throw new AppError('Google account email is not verified', 401);
+  }
+
+  const email = payload.email.trim().toLowerCase();
+  const googleId = payload.sub;
+
+  let user = await User.findOne({ googleId });
+  let isNewUser = false;
+
+  if (!user) {
+    user = await User.findOne({ email });
+    if (user) {
+      // Existing local (password-based) account, same verified email — link
+      // Google as an additional sign-in method; the password is untouched.
+      user.googleId = googleId;
+      if (!user.avatar && payload.picture) user.avatar = payload.picture;
+    }
+  }
+
+  if (!user) {
+    isNewUser = true;
+    const firstName = payload.given_name || payload.name || 'New';
+    const lastName = payload.family_name || 'User';
+    const organizationName = `${firstName}'s Organization`;
+
+    const organization = await Organization.create({
+      name: organizationName,
+      slug: `${organizationName.trim().toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
+      status: 'active',
+    });
+
+    user = new User({
+      organizationId: organization._id,
+      firstName,
+      lastName,
+      email,
+      // Google-authenticated accounts never sign in with a password, but the
+      // schema requires one — a random value they'll never need or see.
+      password: crypto.randomBytes(32).toString('hex'),
+      avatar: payload.picture,
+      role: 'SUPER_ADMIN',
+      department: 'Administration',
+      jobTitle: 'Super Admin',
+      status: 'active',
+      authProvider: 'google',
+      googleId,
+    });
+  }
+
+  if (user.status !== 'active') {
+    throw new AppError('Account is not active', 403);
+  }
+
+  user.lastLogin = new Date();
+  const accessToken = signAccessToken({ userId: user._id, role: user.role, organizationId: user.organizationId });
+  const refreshToken = signRefreshToken({ userId: user._id });
+  user.refreshToken = refreshToken;
+  await user.save();
+
+  return { user: sanitizeUser(user), accessToken, refreshToken, isNewUser };
 }
 
 async function login({ email, password }) {
@@ -150,4 +236,6 @@ async function resetPassword(token, newPassword) {
   return { success: true };
 }
 
-module.exports = { register, login, refresh, logout, getCurrentUser, forgotPassword, resetPassword, sanitizeUser };
+module.exports = {
+  register, login, googleAuth, refresh, logout, getCurrentUser, forgotPassword, resetPassword, sanitizeUser,
+};

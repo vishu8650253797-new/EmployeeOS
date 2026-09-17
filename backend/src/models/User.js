@@ -34,6 +34,12 @@ const userSchema = new Schema(
     jobTitle: { type: String, trim: true },
     status: { type: String, enum: STATUSES, default: 'active' },
     lastLogin: { type: Date },
+    // Google OAuth linkage. `authProvider` is informational (which method
+    // created the account); a 'local' user can still separately link
+    // `googleId` later by signing in with Google using the same, verified
+    // email — this is not the field that gates whether Google sign-in works.
+    authProvider: { type: String, enum: ['local', 'google'], default: 'local' },
+    googleId: { type: String, select: false },
     notificationPreferences: { type: notificationPreferencesSchema, default: () => ({}) },
     refreshToken: { type: String, select: false },
     resetPasswordToken: { type: String, select: false },
@@ -46,6 +52,9 @@ const userSchema = new Schema(
 // so the same email can never legitimately belong to more than one account —
 // a per-organization unique index would let login() match the wrong org's user.
 userSchema.index({ email: 1 }, { unique: true });
+// Sparse: only Google-linked accounts have this field at all, so a unique
+// index here never conflicts with the many users who don't.
+userSchema.index({ googleId: 1 }, { unique: true, sparse: true });
 
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
