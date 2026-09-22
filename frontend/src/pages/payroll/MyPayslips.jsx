@@ -2,6 +2,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Printer, Wallet } from 'lucide-react';
 import { payslipService } from '../../services/payslipService';
 import { useFetch } from '../../hooks/useFetch';
+import { useAuth } from '../../context/AuthContext';
 import { formatCurrencyFromMinorUnits, formatDate } from '../../utils/format';
 import PageHeader from '../../components/layout/PageHeader';
 import Button from '../../components/ui/Button';
@@ -31,9 +32,16 @@ function LineItemTable({ title, items, currency }) {
 }
 
 function PayslipDetail({ id }) {
-  const { data: record, loading, error, refetch } = useFetch(() => payslipService.getMyPayslipById(id), [id]);
+  const { user } = useAuth();
+  const { data: record, loading, error, refetch } = useFetch(
+    () => (user?.employeeId ? payslipService.getMyPayslipById(id) : Promise.resolve(null)),
+    [user?.employeeId, id]
+  );
 
   if (loading) return <LoadingState label="Loading payslip…" />;
+  if (!user?.employeeId) {
+    return <EmptyState icon={Wallet} title="No payslips available" message="This account isn't linked to an employee record." />;
+  }
   if (error) return <ErrorState message={error} onRetry={refetch} />;
   if (!record) return null;
 
@@ -67,7 +75,11 @@ function PayslipDetail({ id }) {
 }
 
 function OverviewSummary() {
-  const { data: overview, loading } = useFetch(() => payslipService.getMyOverview(), []);
+  const { user } = useAuth();
+  const { data: overview, loading } = useFetch(
+    () => (user?.employeeId ? payslipService.getMyOverview() : Promise.resolve(null)),
+    [user?.employeeId]
+  );
   if (loading || !overview?.hasPayslips) return null;
 
   const { latestPayslip, payslipCount } = overview;
@@ -91,7 +103,11 @@ function OverviewSummary() {
 
 function PayslipList() {
   const navigate = useNavigate();
-  const { data, loading, error, refetch } = useFetch(() => payslipService.getMyPayslips({ limit: 50 }), []);
+  const { user } = useAuth();
+  const { data, loading, error, refetch } = useFetch(
+    () => (user?.employeeId ? payslipService.getMyPayslips({ limit: 50 }) : Promise.resolve({ data: [] })),
+    [user?.employeeId]
+  );
   const payslips = data?.data || [];
 
   return (
@@ -101,6 +117,8 @@ function PayslipList() {
       <TableContainer>
         {loading ? (
           <TableSkeleton rows={6} cols={4} />
+        ) : !user?.employeeId ? (
+          <EmptyState icon={Wallet} title="No payslips available" message="This account isn't linked to an employee record." />
         ) : error ? (
           <ErrorState message={error} onRetry={refetch} />
         ) : payslips.length === 0 ? (
