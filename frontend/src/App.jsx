@@ -24,6 +24,7 @@ const EssAttendance = lazy(() => import('./pages/ess/EssAttendance'));
 const EssDocuments = lazy(() => import('./pages/ess/EssDocuments'));
 const EssHrRequests = lazy(() => import('./pages/ess/EssHrRequests'));
 const EssHrRequestDetail = lazy(() => import('./pages/ess/EssHrRequestDetail'));
+const NotificationsPage = lazy(() => import('./pages/notifications/NotificationsPage'));
 const EmployeeList = lazy(() => import('./pages/employees/EmployeeList'));
 const EmployeeForm = lazy(() => import('./pages/employees/EmployeeForm'));
 const EmployeeProfile = lazy(() => import('./pages/employees/EmployeeProfile'));
@@ -243,6 +244,8 @@ export default function App() {
                   <Route path="/payroll/analytics" element={<PayrollAnalytics />} />
                   <Route path="/my-payslips" element={<MyPayslips />} />
                   <Route path="/my-payslips/:id" element={<MyPayslips />} />
+
+                  <Route path="/notifications" element={<NotificationsPage />} />
 
                   <Route path="/reports" element={<ComingSoon title="Reports" />} />
                   <Route path="/settings" element={<ComingSoon title="Settings" />} />

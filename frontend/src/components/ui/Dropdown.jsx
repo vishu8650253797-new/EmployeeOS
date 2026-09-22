@@ -26,7 +26,7 @@ export default function Dropdown({ trigger, align = 'right', width = 'w-56', chi
       {open && (
         <div
           role="menu"
-          className={`animate-fade-in-up absolute z-50 mt-1.5 ${width} overflow-hidden rounded-xl border border-line bg-surface py-1 shadow-pop ${
+          className={`animate-fade-in-up absolute z-50 mt-1.5 ${width} max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-line bg-surface py-1 shadow-pop ${
             align === 'right' ? 'right-0' : 'left-0'
           }`}
           onClick={() => setOpen(false)}

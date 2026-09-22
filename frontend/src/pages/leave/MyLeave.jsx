@@ -45,21 +45,26 @@ export default function MyLeave() {
     refetch,
   } = useFetch(
     () =>
-      leaveRequestService
-        .getMyLeaveRequests(statusFilter === 'ALL' ? {} : { status: statusFilter })
-        .then((res) => res.data || []),
-    [statusFilter]
+      user?.employeeId
+        ? leaveRequestService
+            .getMyLeaveRequests(statusFilter === 'ALL' ? {} : { status: statusFilter })
+            .then((res) => res.data || [])
+        : Promise.resolve([]),
+    [user?.employeeId, statusFilter]
   );
 
   const {
     data: balances,
     loading: balanceLoading,
     refetch: refetchBalances,
-  } = useFetch(() => leaveBalanceService.getMyLeaveBalances().then((res) => res.data || []), []);
+  } = useFetch(
+    () => (user?.employeeId ? leaveBalanceService.getMyLeaveBalances().then((res) => res.data || []) : Promise.resolve([])),
+    [user?.employeeId]
+  );
 
   const { data: allRequests, refetch: refetchAll } = useFetch(
-    () => leaveRequestService.getMyLeaveRequests().then((res) => res.data || []),
-    []
+    () => (user?.employeeId ? leaveRequestService.getMyLeaveRequests().then((res) => res.data || []) : Promise.resolve([])),
+    [user?.employeeId]
   );
 
   function refreshAll() {
@@ -119,6 +124,7 @@ export default function MyLeave() {
         }
       />
 
+      {user?.employeeId && (
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         {balanceLoading
           ? Array.from({ length: 4 }).map((_, i) => (
@@ -150,6 +156,7 @@ export default function MyLeave() {
               </Card>
             ))}
       </div>
+      )}
 
       <div className="mt-6">
         <Tabs tabs={tabs} active={statusFilter} onChange={setStatusFilter} className="mb-4" />
@@ -158,6 +165,12 @@ export default function MyLeave() {
       <TableContainer>
         {loading ? (
           <TableSkeleton rows={5} cols={5} />
+        ) : !user?.employeeId ? (
+          <EmptyState
+            icon={CalendarOff}
+            title="No leave requests available"
+            message="This account isn't linked to an employee record."
+          />
         ) : error ? (
           <ErrorState message={error} onRetry={refetch} />
         ) : !requests || requests.length === 0 ? (

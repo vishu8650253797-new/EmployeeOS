@@ -78,13 +78,15 @@ export default function MyAttendance() {
 
   const { data: historyResponse, loading: historyLoading, error: historyError, refetch: refetchHistory } = useFetch(
     () =>
-      attendanceService.getMyHistory({
-        month: month || undefined,
-        year: year || undefined,
-        page,
-        limit,
-      }),
-    [month, year, page, limit]
+      user?.employeeId
+        ? attendanceService.getMyHistory({
+            month: month || undefined,
+            year: year || undefined,
+            page,
+            limit,
+          })
+        : Promise.resolve({ records: [], pagination: { page: 1, totalPages: 1 } }),
+    [user?.employeeId, month, year, page, limit]
   );
 
   const historyRecords = historyResponse?.records || [];

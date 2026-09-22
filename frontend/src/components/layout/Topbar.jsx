@@ -191,6 +191,14 @@ export default function Topbar({ onOpenMobileNav }) {
               </button>
             ))}
           </div>
+          <DropdownSeparator />
+          <button
+            type="button"
+            onClick={() => navigate('/notifications')}
+            className="focus-ring block w-full px-3.5 py-2 text-center text-[13px] font-medium text-brand-700 transition-colors hover:bg-canvas hover:text-brand-800"
+          >
+            View all notifications
+          </button>
         </Dropdown>
 
         {/* User menu */}

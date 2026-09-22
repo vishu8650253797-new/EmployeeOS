@@ -100,6 +100,47 @@ describe('Notification API', () => {
     const res = await request(app).get('/api/notifications');
     expect(res.status).toBe(401);
   });
+
+  test('the isRead filter returns only matching notifications', async () => {
+    const org = await createOrganization();
+    const userA = await createUser(org._id, { role: 'EMPLOYEE' });
+    const read = await seedNotification(org, userA, { title: 'Already read' });
+    await seedNotification(org, userA, { title: 'Still unread' });
+    await request(app).put(`/api/notifications/${read._id}/read`).set('Authorization', authHeaderFor(userA));
+
+    const unreadRes = await request(app).get('/api/notifications?isRead=false').set('Authorization', authHeaderFor(userA));
+    expect(unreadRes.body.data).toHaveLength(1);
+    expect(unreadRes.body.data[0].title).toBe('Still unread');
+
+    const readRes = await request(app).get('/api/notifications?isRead=true').set('Authorization', authHeaderFor(userA));
+    expect(readRes.body.data).toHaveLength(1);
+    expect(readRes.body.data[0].title).toBe('Already read');
+  });
+
+  test('an HrRequest notification is categorized as HR_REQUEST', async () => {
+    const org = await createOrganization();
+    const userA = await createUser(org._id, { role: 'EMPLOYEE' });
+    const notification = await seedNotification(org, userA, {
+      type: 'HR_REQUEST_CREATED', entityType: 'HrRequest', title: 'New HR request',
+    });
+    expect(notification.category).toBe('HR_REQUEST');
+  });
+
+  test('a user in another organization cannot see or mark-read a notification from a different org', async () => {
+    const orgA = await createOrganization();
+    const orgB = await createOrganization();
+    const userA = await createUser(orgA._id, { role: 'EMPLOYEE' });
+    const userB = await createUser(orgB._id, { role: 'EMPLOYEE' });
+    const notification = await seedNotification(orgA, userA);
+
+    const listRes = await request(app).get('/api/notifications').set('Authorization', authHeaderFor(userB));
+    expect(listRes.body.data).toHaveLength(0);
+
+    const readRes = await request(app)
+      .put(`/api/notifications/${notification._id}/read`)
+      .set('Authorization', authHeaderFor(userB));
+    expect(readRes.status).toBe(404);
+  });
 });
 
 describe('Notification preferences', () => {

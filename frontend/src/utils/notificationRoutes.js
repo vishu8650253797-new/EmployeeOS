@@ -17,6 +17,7 @@ const ROUTE_BUILDERS = {
   PayrollRun: (id) => `/payroll/runs/${id}`,
   PayrollRecord: (id) => `/my-payslips/${id}`,
   EmployeeCompensation: () => '/payroll/compensation',
+  HrRequest: (id) => `/ess/requests/${id}`,
 };
 
 export function getNotificationRoute(entityType, entityId) {

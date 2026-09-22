@@ -4,6 +4,7 @@ import { leaveService } from '../../services/leaveService';
 import { leaveRequestService } from '../../services/leaveRequestService';
 import { useFetch } from '../../hooks/useFetch';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import { useSocketEvent } from '../../hooks/useSocket';
 import { SOCKET_EVENTS } from '../../utils/socketEvents';
 import { formatDate } from '../../utils/format';
@@ -32,6 +33,7 @@ import {
 const ACTION_LABELS = { approve: 'Approve', reject: 'Reject', cancel: 'Cancel' };
 
 export default function Leave() {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [detailTarget, setDetailTarget] = useState(null);
@@ -47,8 +49,8 @@ export default function Leave() {
   } = useFetch(() => leaveService.getLeaveRequests({ status: statusFilter }), [statusFilter]);
 
   const { data: balances, loading: balanceLoading } = useFetch(
-    () => leaveService.getLeaveBalance(),
-    []
+    () => (user?.employeeId ? leaveService.getLeaveBalance() : Promise.resolve([])),
+    [user?.employeeId]
   );
 
   const { data: allRequests, refetch: refetchAll } = useFetch(
@@ -122,7 +124,8 @@ export default function Leave() {
         }
       />
 
-      {/* Leave balance summary */}
+      {/* Leave balance summary — only meaningful for a caller who is also an employee */}
+      {user?.employeeId && (
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         {balanceLoading
           ? Array.from({ length: 4 }).map((_, i) => (
@@ -148,6 +151,7 @@ export default function Leave() {
               </Card>
             ))}
       </div>
+      )}
 
       <div className="mt-6">
         <Tabs tabs={tabs} active={statusFilter} onChange={setStatusFilter} className="mb-4" />

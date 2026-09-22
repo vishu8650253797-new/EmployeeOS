@@ -27,7 +27,7 @@ export default function EmployeeDocumentDashboard() {
       setLoading(true);
       const [docs, reqs, analyticsData] = await Promise.all([
         documentService.getDocuments(),
-        documentRequestService.getMyRequests(),
+        user?.employeeId ? documentRequestService.getMyRequests() : Promise.resolve([]),
         documentAnalyticsService.getOverview(),
       ]);
       setDocuments(docs);
