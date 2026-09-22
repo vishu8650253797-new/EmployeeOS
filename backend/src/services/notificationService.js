@@ -30,6 +30,7 @@ const ENTITY_TYPE_CATEGORIES = {
   PayrollRun: 'PAYROLL',
   PayrollRecord: 'PAYROLL',
   EmployeeCompensation: 'PAYROLL',
+  HrRequest: 'HR_REQUEST',
 };
 
 function deriveCategory(entityType) {

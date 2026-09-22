@@ -7,6 +7,12 @@ export const documentService = {
     return response.data.data || [];
   },
 
+  // Get the authenticated user's own documents (ESS self-service)
+  getMyDocuments: async (params = {}) => {
+    const response = await api.get('/documents/my', { params });
+    return response.data;
+  },
+
   // Get documents for a specific employee
   getEmployeeDocuments: async (employeeId, params = {}) => {
     const response = await api.get(`/documents/employee/${employeeId}`, { params });

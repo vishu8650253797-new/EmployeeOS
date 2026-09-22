@@ -44,4 +44,5 @@ module.exports = {
   PayrollPeriod: require('./PayrollPeriod'),
   PayrollRun: require('./PayrollRun'),
   PayrollRecord: require('./PayrollRecord'),
+  HrRequest: require('./HrRequest'),
 };

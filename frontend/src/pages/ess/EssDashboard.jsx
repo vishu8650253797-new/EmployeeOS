@@ -17,8 +17,8 @@ const CAPABILITY_UI = {
   attendance: { icon: CalendarCheck, to: '/ess/attendance' },
   leave: { icon: CalendarOff, to: '/ess/leave' },
   payroll: { icon: Wallet, to: '/my-payslips' },
-  documents: { icon: FolderOpen, to: '/my-documents' },
-  requests: { icon: ClipboardList },
+  documents: { icon: FolderOpen, to: '/ess/documents' },
+  requests: { icon: ClipboardList, to: '/ess/requests' },
   notifications: { icon: Bell },
 };
 

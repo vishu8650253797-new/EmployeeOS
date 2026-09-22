@@ -25,7 +25,7 @@ const ESS_CAPABILITIES = [
 
 // Capabilities not backed by a real module yet — shown as "coming soon"
 // rather than silently omitted, so the shell can render a placeholder card.
-const NOT_YET_IMPLEMENTED = ['requests'];
+const NOT_YET_IMPLEMENTED = [];
 
 // Capabilities that stay available even when the employee's account is
 // under a restriction (e.g. suspended) — viewing your own identity and

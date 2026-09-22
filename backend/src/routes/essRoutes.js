@@ -7,6 +7,7 @@ const {
 } = require('../validators/essProfileValidator');
 const essLeaveRoutes = require('./essLeaveRoutes');
 const essAttendanceRoutes = require('./essAttendanceRoutes');
+const essHrRequestRoutes = require('./essHrRequestRoutes');
 
 const router = Router();
 
@@ -34,5 +35,6 @@ router.delete('/me/profile/emergency-contacts/:contactId', contactIdParam, async
 
 router.use('/leave', essLeaveRoutes);
 router.use('/attendance', essAttendanceRoutes);
+router.use('/requests', essHrRequestRoutes);
 
 module.exports = router;

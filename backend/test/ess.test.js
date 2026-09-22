@@ -40,7 +40,7 @@ describe('GET /api/ess/me', () => {
     expect(capabilities.attendance.status).toBe('available');
     expect(capabilities.payroll.status).toBe('available');
     expect(capabilities.documents.status).toBe('available');
-    expect(capabilities.requests.status).toBe('coming_soon');
+    expect(capabilities.requests.status).toBe('available');
     expect(capabilities.notifications.status).toBe('available');
   });
 

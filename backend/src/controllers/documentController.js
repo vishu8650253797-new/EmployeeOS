@@ -1,6 +1,7 @@
 const { Employee } = require('../models');
 const documentService = require('../services/documentService');
 const auditLogService = require('../services/auditLogService');
+const AppError = require('../utils/AppError');
 
 async function resolveEmployeeId(req) {
   if (req.user.employeeId) return req.user.employeeId;
@@ -23,7 +24,7 @@ exports.getDocuments = async (req, res) => {
 
 exports.getMyDocuments = async (req, res) => {
   const employeeId = await resolveEmployeeId(req);
-  if (!employeeId) throw new Error('Employee profile not linked');
+  if (!employeeId) throw new AppError('Employee profile not linked', 400);
   const { data, pagination } = await documentService.getMyDocuments(req.organizationId, employeeId, req.query);
   res.json({ success: true, data, pagination });
 };

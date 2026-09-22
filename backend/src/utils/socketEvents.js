@@ -136,6 +136,10 @@ const SOCKET_EVENTS = {
   PAYROLL_STRUCTURE_UPDATED: 'payroll:structureUpdated',
   PAYROLL_COMPENSATION_UPDATED: 'payroll:compensationUpdated',
   EMPLOYEE_PROFILE_UPDATED: 'employee:profileUpdated',
+  HR_REQUEST_CREATED: 'hrRequest:created',
+  HR_REQUEST_STATUS_CHANGED: 'hrRequest:statusChanged',
+  HR_REQUEST_MESSAGE_ADDED: 'hrRequest:messageAdded',
+  HR_REQUEST_CANCELLED: 'hrRequest:cancelled',
 };
 
 module.exports = SOCKET_EVENTS;

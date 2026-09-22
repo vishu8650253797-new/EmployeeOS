@@ -93,6 +93,10 @@ export const STATUS_TONES = {
   CLOSED: 'neutral',
   ADJUSTED: 'warning',
   SUPERSEDED: 'neutral',
+  // HR request statuses (SUBMITTED, IN_PROGRESS, REJECTED, CANCELLED, CLOSED
+  // reuse the tones mapped above).
+  UNDER_REVIEW: 'info',
+  RESOLVED: 'success',
 };
 
 export const PRIORITY_TONES = {

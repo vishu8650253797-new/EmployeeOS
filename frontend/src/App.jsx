@@ -21,6 +21,9 @@ const EssLeave = lazy(() => import('./pages/ess/EssLeave'));
 const EssLeaveHistory = lazy(() => import('./pages/ess/EssLeaveHistory'));
 const EssLeaveDetail = lazy(() => import('./pages/ess/EssLeaveDetail'));
 const EssAttendance = lazy(() => import('./pages/ess/EssAttendance'));
+const EssDocuments = lazy(() => import('./pages/ess/EssDocuments'));
+const EssHrRequests = lazy(() => import('./pages/ess/EssHrRequests'));
+const EssHrRequestDetail = lazy(() => import('./pages/ess/EssHrRequestDetail'));
 const EmployeeList = lazy(() => import('./pages/employees/EmployeeList'));
 const EmployeeForm = lazy(() => import('./pages/employees/EmployeeForm'));
 const EmployeeProfile = lazy(() => import('./pages/employees/EmployeeProfile'));
@@ -142,6 +145,9 @@ export default function App() {
                   <Route path="/ess/leave/history" element={<EssLeaveHistory />} />
                   <Route path="/ess/leave/:id" element={<EssLeaveDetail />} />
                   <Route path="/ess/attendance" element={<EssAttendance />} />
+                  <Route path="/ess/documents" element={<EssDocuments />} />
+                  <Route path="/ess/requests" element={<EssHrRequests />} />
+                  <Route path="/ess/requests/:id" element={<EssHrRequestDetail />} />
 
                   <Route path="/employees" element={<EmployeeList />} />
                   <Route path="/employees/new" element={<EmployeeForm />} />
