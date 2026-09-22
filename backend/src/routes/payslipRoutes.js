@@ -11,6 +11,9 @@ const router = Router();
 router.use(authMiddleware);
 
 // Self-service — any authenticated user with a linked employee record.
+// /me/overview must be registered before /me/:id or it would be swallowed
+// by the :id param route (and fail its isMongoId validation).
+router.get('/me/overview', asyncHandler(payslipController.getMyPayrollOverview));
 router.get('/me', asyncHandler(payslipController.getMyPayslips));
 router.get('/me/:id', byId, asyncHandler(payslipController.getMyPayslipById));
 

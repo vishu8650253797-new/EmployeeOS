@@ -11,6 +11,11 @@ export const payslipService = {
     return data.data;
   },
 
+  async getMyOverview() {
+    const { data } = await api.get('/payroll/payslips/me/overview');
+    return data.data;
+  },
+
   async getPayslips(params = {}) {
     const { data } = await api.get('/payroll/payslips', { params });
     return data;

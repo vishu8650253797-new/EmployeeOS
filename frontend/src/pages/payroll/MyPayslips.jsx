@@ -66,6 +66,29 @@ function PayslipDetail({ id }) {
   );
 }
 
+function OverviewSummary() {
+  const { data: overview, loading } = useFetch(() => payslipService.getMyOverview(), []);
+  if (loading || !overview?.hasPayslips) return null;
+
+  const { latestPayslip, payslipCount } = overview;
+  const cells = [
+    { label: 'Latest net pay', value: formatCurrencyFromMinorUnits(latestPayslip.netPayMinorUnits, latestPayslip.currency) },
+    { label: 'Latest pay date', value: latestPayslip.period?.payDate ? formatDate(latestPayslip.period.payDate) : '—' },
+    { label: 'Total payslips', value: payslipCount },
+  ];
+
+  return (
+    <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {cells.map((cell) => (
+        <div key={cell.label} className="rounded-xl border border-line bg-surface p-4 shadow-card">
+          <p className="text-[13px] text-ink-500">{cell.label}</p>
+          <p className="mt-1.5 text-xl font-semibold tracking-tight text-ink-900">{cell.value}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function PayslipList() {
   const navigate = useNavigate();
   const { data, loading, error, refetch } = useFetch(() => payslipService.getMyPayslips({ limit: 50 }), []);
@@ -74,6 +97,7 @@ function PayslipList() {
   return (
     <div>
       <PageHeader title="My Payslips" subtitle="Your finalized payroll history" />
+      <OverviewSummary />
       <TableContainer>
         {loading ? (
           <TableSkeleton rows={6} cols={4} />
