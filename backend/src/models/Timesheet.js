@@ -1,14 +1,20 @@
 const { Schema, model } = require('mongoose');
 
-// Timesheet Preparation & Submission (Step 13C) — built on top of the Step
-// 13A TimeEntry foundation without modifying it. A Timesheet is a
-// server-computed weekly (Monday-Sunday) rollup of an employee's own
-// TimeEntry records: while DRAFT, entries are resolved live by date-range
-// query (see timesheetService.refreshDraft); at SUBMIT, the included entries
-// are frozen into `timeEntryIds` and the totals/validation snapshot becomes
-// final, mirroring how PayrollRecord freezes its line items at finalize.
+// Timesheet Preparation, Submission & Manager Review (Steps 13C/13D) — built
+// on top of the Step 13A TimeEntry foundation without modifying it. A
+// Timesheet is a server-computed weekly (Monday-Sunday) rollup of an
+// employee's own TimeEntry records: while DRAFT, entries are resolved live
+// by date-range query (see timesheetService.refreshIfDraft); at SUBMIT, the
+// included entries are frozen into `timeEntryIds` and the totals/validation
+// snapshot becomes final, mirroring how PayrollRecord freezes its line
+// items at finalize. reviewedBy/reviewedAt/rejectionReason mirror
+// LeaveRequest's field names for the same concept.
 
-const TIMESHEET_STATUSES = ['DRAFT', 'SUBMITTED'];
+const TIMESHEET_STATUSES = ['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED'];
+// Once left DRAFT, a timesheet is never editable/re-preparable again — there
+// is no "returned for correction" workflow in this codebase today (leave
+// doesn't have one either), so a rejection is terminal like leave's.
+const LOCKED_STATUSES = ['SUBMITTED', 'APPROVED', 'REJECTED'];
 
 const validationIssueSchema = new Schema(
   { code: { type: String, required: true }, message: { type: String, required: true } },
@@ -40,6 +46,10 @@ const timesheetSchema = new Schema(
 
     submittedAt: { type: Date },
 
+    reviewedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    reviewedAt: { type: Date },
+    rejectionReason: { type: String, trim: true, maxlength: 1000 },
+
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     updatedBy: { type: Schema.Types.ObjectId, ref: 'User' },
   },
@@ -62,3 +72,4 @@ timesheetSchema.set('toJSON', {
 
 module.exports = model('Timesheet', timesheetSchema);
 module.exports.TIMESHEET_STATUSES = TIMESHEET_STATUSES;
+module.exports.LOCKED_STATUSES = LOCKED_STATUSES;

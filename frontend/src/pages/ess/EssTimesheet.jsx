@@ -87,6 +87,9 @@ export default function EssTimesheet() {
   const days = groupByDate(entries || []);
   const isDraft = timesheet?.status === 'DRAFT';
   const isSubmitted = timesheet?.status === 'SUBMITTED';
+  const isApproved = timesheet?.status === 'APPROVED';
+  const isRejected = timesheet?.status === 'REJECTED';
+  const isLocked = isSubmitted || isApproved || isRejected;
 
   return (
     <div>
@@ -100,7 +103,7 @@ export default function EssTimesheet() {
               <RefreshCw size={14} />
               Refresh
             </Button>
-            {!isSubmitted && (
+            {!isLocked && (
               <Button onClick={handlePrepare} loading={preparing}>
                 {timesheet ? 'Re-check entries' : 'Prepare Timesheet'}
               </Button>
@@ -139,18 +142,35 @@ export default function EssTimesheet() {
               <p className="mt-1.5 text-xl font-semibold tracking-tight text-ink-900">{timesheet.entryCount}</p>
             </div>
             <div className="rounded-xl border border-line bg-surface p-4 shadow-card">
-              <p className="text-[13px] text-ink-500">{isSubmitted ? 'Submitted' : 'Prepared'}</p>
+              <p className="text-[13px] text-ink-500">{isLocked ? 'Submitted' : 'Prepared'}</p>
               <p className="mt-1.5 text-sm font-medium text-ink-900">
-                {isSubmitted ? formatDate(timesheet.submittedAt) : formatDate(timesheet.createdAt)}
+                {isLocked ? formatDate(timesheet.submittedAt) : formatDate(timesheet.createdAt)}
               </p>
             </div>
             <div className="rounded-xl border border-line bg-surface p-4 shadow-card">
-              <p className="text-[13px] text-ink-500">Ready to submit</p>
-              <p className={`mt-1.5 text-sm font-medium ${timesheet.isReadyForSubmission ? 'text-success-700' : 'text-danger-700'}`}>
-                {isSubmitted ? 'Submitted' : timesheet.isReadyForSubmission ? 'Yes' : 'No — see errors below'}
-              </p>
+              <p className="text-[13px] text-ink-500">{isApproved || isRejected ? 'Reviewed' : 'Ready to submit'}</p>
+              {isApproved || isRejected ? (
+                <p className="mt-1.5 text-sm font-medium text-ink-900">
+                  {timesheet.reviewedAt ? formatDate(timesheet.reviewedAt) : '—'}
+                  {timesheet.reviewedBy && ` · ${timesheet.reviewedBy.firstName} ${timesheet.reviewedBy.lastName}`}
+                </p>
+              ) : (
+                <p className={`mt-1.5 text-sm font-medium ${timesheet.isReadyForSubmission ? 'text-success-700' : 'text-danger-700'}`}>
+                  {isSubmitted ? 'Submitted' : timesheet.isReadyForSubmission ? 'Yes' : 'No — see errors below'}
+                </p>
+              )}
             </div>
           </div>
+
+          {isRejected && timesheet.rejectionReason && (
+            <div className="mb-6 rounded-xl border border-danger-600/20 bg-danger-50 p-4">
+              <p className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-danger-700">
+                <AlertTriangle size={14} />
+                Rejected
+              </p>
+              <p className="text-[13px] text-danger-700">{timesheet.rejectionReason}</p>
+            </div>
+          )}
 
           {timesheet.validationErrors?.length > 0 && (
             <div className="mb-4 rounded-xl border border-danger-600/20 bg-danger-50 p-4">

@@ -3,6 +3,7 @@ import {
   Users,
   Building2,
   CalendarCheck,
+  ClipboardCheck,
   CalendarOff,
   CalendarPlus,
   Layers,
@@ -48,6 +49,7 @@ export const NAV_SECTIONS = [
     title: 'Management',
     items: [
       { label: 'Attendance', to: '/attendance', icon: CalendarCheck },
+      { label: 'Timesheets', to: '/timesheets', icon: ClipboardCheck },
       { label: 'Leave', to: '/leave', icon: CalendarOff },
       { label: 'My Leave', to: '/my-leave', icon: CalendarPlus },
       { label: 'Leave Types', to: '/leave-types', icon: Layers },

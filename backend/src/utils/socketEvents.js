@@ -140,6 +140,8 @@ const SOCKET_EVENTS = {
   HR_REQUEST_STATUS_CHANGED: 'hrRequest:statusChanged',
   HR_REQUEST_MESSAGE_ADDED: 'hrRequest:messageAdded',
   HR_REQUEST_CANCELLED: 'hrRequest:cancelled',
+  TIMESHEET_APPROVED: 'timesheet:approved',
+  TIMESHEET_REJECTED: 'timesheet:rejected',
 };
 
 module.exports = SOCKET_EVENTS;

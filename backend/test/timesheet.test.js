@@ -1,6 +1,6 @@
 const request = require('supertest');
 const app = require('../src/app');
-const { TimeEntry, Timesheet, AuditLog } = require('../src/models');
+const { TimeEntry, Timesheet, AuditLog, Notification } = require('../src/models');
 const timesheetService = require('../src/services/timesheetService');
 const { connect, closeDatabase, clearDatabase } = require('./helpers/db');
 const { createOrganization, createUser, createUserWithEmployee, authHeaderFor } = require('./helpers/factories');
@@ -336,5 +336,285 @@ describe('Timesheets — security', () => {
     const { employeeUser } = await setup();
     const res = await request(app).get('/api/ess/timesheets/not-a-valid-id').set('Authorization', authHeaderFor(employeeUser));
     expect(res.status).toBe(400);
+  });
+});
+
+// ---- Manager review (Step 13D) --------------------------------------------
+
+async function setupSubmittedTimesheetFor(org, employeeUser) {
+  const monday = currentPeriodMonday();
+  const startRes = await request(app).post('/api/ess/time-entries/start').set('Authorization', authHeaderFor(employeeUser));
+  await request(app).post(`/api/ess/time-entries/${startRes.body.data.id}/end`).set('Authorization', authHeaderFor(employeeUser)).send({ notes: 'x' });
+  const prepared = await request(app).post('/api/ess/timesheets/prepare').set('Authorization', authHeaderFor(employeeUser));
+  const submitted = await request(app).post(`/api/ess/timesheets/${prepared.body.data.id}/submit`).set('Authorization', authHeaderFor(employeeUser));
+  return submitted.body.data.id;
+}
+
+async function setupManagerAndReport(org) {
+  const { user: managerUser, employee: managerEmployee } = await createUserWithEmployee(org._id, { role: 'MANAGER' });
+  const { user: employeeUser, employee } = await createUserWithEmployee(org._id, { role: 'EMPLOYEE', managerId: managerEmployee._id, joiningDate: new Date('2025-01-01') });
+  return { managerUser, managerEmployee, employeeUser, employee };
+}
+
+describe('Timesheets — manager review, authorization', () => {
+  test('an authorized manager can list their direct report\'s submitted timesheets', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    await setupSubmittedTimesheetFor(org, employeeUser);
+
+    const res = await request(app).get('/api/timesheets').set('Authorization', authHeaderFor(managerUser));
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].employee.firstName).toBeTruthy();
+  });
+
+  test('a plain employee cannot access manager endpoints', async () => {
+    const org = await createOrganization();
+    const { employeeUser } = await setupManagerAndReport(org);
+    const res = await request(app).get('/api/timesheets').set('Authorization', authHeaderFor(employeeUser));
+    expect(res.status).toBe(403);
+  });
+
+  test('a manager cannot see timesheets from another organization', async () => {
+    const orgA = await createOrganization();
+    const { employeeUser } = await setupManagerAndReport(orgA);
+    await setupSubmittedTimesheetFor(orgA, employeeUser);
+
+    const orgB = await createOrganization();
+    const { managerUser: managerB } = await setupManagerAndReport(orgB);
+
+    const res = await request(app).get('/api/timesheets').set('Authorization', authHeaderFor(managerB));
+    expect(res.body.data).toHaveLength(0);
+  });
+
+  test('an unrelated manager cannot view or act on an employee outside their scope', async () => {
+    const org = await createOrganization();
+    const { employeeUser } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+    const { user: unrelatedManager } = await createUserWithEmployee(org._id, { role: 'MANAGER', firstName: 'Unrelated' });
+
+    const viewRes = await request(app).get(`/api/timesheets/${id}`).set('Authorization', authHeaderFor(unrelatedManager));
+    expect(viewRes.status).toBe(403);
+
+    const approveRes = await request(app).post(`/api/timesheets/${id}/approve`).set('Authorization', authHeaderFor(unrelatedManager));
+    expect(approveRes.status).toBe(403);
+
+    const stillSubmitted = await Timesheet.findById(id).lean();
+    expect(stillSubmitted.status).toBe('SUBMITTED');
+  });
+
+  test('a manager can view full details of their direct report\'s submitted timesheet', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+
+    const res = await request(app).get(`/api/timesheets/${id}`).set('Authorization', authHeaderFor(managerUser));
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('SUBMITTED');
+
+    const entriesRes = await request(app).get(`/api/timesheets/${id}/entries`).set('Authorization', authHeaderFor(managerUser));
+    expect(entriesRes.body.data).toHaveLength(1);
+  });
+
+  test('HR_ADMIN (unscoped) can view and act on any employee\'s timesheet regardless of managerId', async () => {
+    const org = await createOrganization();
+    const { employeeUser } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+
+    const res = await request(app).post(`/api/timesheets/${id}/approve`).set('Authorization', authHeaderFor(hrAdmin));
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('APPROVED');
+  });
+
+  test('a draft timesheet is not reachable at the manager endpoint (not yet submitted)', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const startRes = await request(app).post('/api/ess/time-entries/start').set('Authorization', authHeaderFor(employeeUser));
+    await request(app).post(`/api/ess/time-entries/${startRes.body.data.id}/end`).set('Authorization', authHeaderFor(employeeUser));
+    const prepared = await request(app).post('/api/ess/timesheets/prepare').set('Authorization', authHeaderFor(employeeUser));
+
+    const res = await request(app).get(`/api/timesheets/${prepared.body.data.id}`).set('Authorization', authHeaderFor(managerUser));
+    expect(res.status).toBe(404);
+
+    const approveRes = await request(app).post(`/api/timesheets/${prepared.body.data.id}/approve`).set('Authorization', authHeaderFor(managerUser));
+    expect(approveRes.status).toBe(404);
+  });
+});
+
+describe('Timesheets — approval workflow', () => {
+  test('a manager can approve a valid submitted timesheet', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+
+    const res = await request(app).post(`/api/timesheets/${id}/approve`).set('Authorization', authHeaderFor(managerUser));
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('APPROVED');
+    expect(res.body.data.reviewedAt).toBeTruthy();
+    expect(res.body.data.reviewedBy).toBeTruthy();
+  });
+
+  test('an already-approved timesheet cannot be approved again', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+    await request(app).post(`/api/timesheets/${id}/approve`).set('Authorization', authHeaderFor(managerUser));
+
+    const res = await request(app).post(`/api/timesheets/${id}/approve`).set('Authorization', authHeaderFor(managerUser));
+    expect(res.status).toBe(409);
+  });
+
+  test('an approved timesheet cannot subsequently be rejected (invalid transition)', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+    await request(app).post(`/api/timesheets/${id}/approve`).set('Authorization', authHeaderFor(managerUser));
+
+    const res = await request(app).post(`/api/timesheets/${id}/reject`).set('Authorization', authHeaderFor(managerUser)).send({ reason: 'too late' });
+    expect(res.status).toBe(409);
+  });
+
+  test('tampered reviewer, employee and organization IDs in the approve body are ignored', async () => {
+    const org = await createOrganization();
+    const { managerUser, managerEmployee, employeeUser, employee } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+
+    const res = await request(app)
+      .post(`/api/timesheets/${id}/approve`)
+      .set('Authorization', authHeaderFor(managerUser))
+      .send({ reviewerId: '000000000000000000000000', employeeId: '000000000000000000000000', organizationId: '000000000000000000000000', status: 'REJECTED' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('APPROVED');
+    expect(res.body.data.employee.id).toBe(employee._id.toString());
+  });
+
+  test('concurrent approval requests are handled safely — exactly one succeeds', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+
+    const [a, b] = await Promise.all([
+      request(app).post(`/api/timesheets/${id}/approve`).set('Authorization', authHeaderFor(managerUser)),
+      request(app).post(`/api/timesheets/${id}/approve`).set('Authorization', authHeaderFor(managerUser)),
+    ]);
+    expect([a.status, b.status].sort()).toEqual([200, 409]);
+  });
+
+  test('an audit log and employee notification are created on approval', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser, employee } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+    await request(app).post(`/api/timesheets/${id}/approve`).set('Authorization', authHeaderFor(managerUser));
+
+    const logs = await AuditLog.find({ action: 'TIMESHEET_APPROVED', entityId: id });
+    expect(logs).toHaveLength(1);
+
+    const notifications = await Notification.find({ recipientId: employeeUser._id, type: 'TIMESHEET_APPROVED' });
+    expect(notifications).toHaveLength(1);
+  });
+
+  test('the employee sees the approved status and reviewer info afterward', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+    await request(app).post(`/api/timesheets/${id}/approve`).set('Authorization', authHeaderFor(managerUser));
+
+    const res = await request(app).get(`/api/ess/timesheets/${id}`).set('Authorization', authHeaderFor(employeeUser));
+    expect(res.body.data.status).toBe('APPROVED');
+    expect(res.body.data.reviewedBy).toBeTruthy();
+  });
+});
+
+describe('Timesheets — rejection workflow', () => {
+  test('rejection requires a non-empty reason', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+
+    const res = await request(app).post(`/api/timesheets/${id}/reject`).set('Authorization', authHeaderFor(managerUser)).send({});
+    expect(res.status).toBe(400);
+
+    const stillSubmitted = await Timesheet.findById(id).lean();
+    expect(stillSubmitted.status).toBe('SUBMITTED');
+  });
+
+  test('an empty or whitespace-only reason is rejected', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+
+    const res = await request(app).post(`/api/timesheets/${id}/reject`).set('Authorization', authHeaderFor(managerUser)).send({ reason: '   ' });
+    expect(res.status).toBe(400);
+  });
+
+  test('a manager can reject with a valid reason, and the reason is visible to the employee', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+
+    const res = await request(app)
+      .post(`/api/timesheets/${id}/reject`)
+      .set('Authorization', authHeaderFor(managerUser))
+      .send({ reason: 'Missing notes on several entries' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('REJECTED');
+    expect(res.body.data.rejectionReason).toBe('Missing notes on several entries');
+
+    const employeeView = await request(app).get(`/api/ess/timesheets/${id}`).set('Authorization', authHeaderFor(employeeUser));
+    expect(employeeView.body.data.rejectionReason).toBe('Missing notes on several entries');
+  });
+
+  test('an already-rejected timesheet cannot be rejected again', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+    await request(app).post(`/api/timesheets/${id}/reject`).set('Authorization', authHeaderFor(managerUser)).send({ reason: 'first' });
+
+    const res = await request(app).post(`/api/timesheets/${id}/reject`).set('Authorization', authHeaderFor(managerUser)).send({ reason: 'second' });
+    expect(res.status).toBe(409);
+  });
+
+  test('a rejected timesheet cannot be re-prepared (no resubmission workflow exists)', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+    await request(app).post(`/api/timesheets/${id}/reject`).set('Authorization', authHeaderFor(managerUser)).send({ reason: 'x' });
+
+    const res = await request(app).post('/api/ess/timesheets/prepare').set('Authorization', authHeaderFor(employeeUser));
+    expect(res.status).toBe(409);
+  });
+
+  test('an audit log and employee notification (including the reason) are created on rejection', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+    await request(app).post(`/api/timesheets/${id}/reject`).set('Authorization', authHeaderFor(managerUser)).send({ reason: 'Please add notes' });
+
+    const logs = await AuditLog.find({ action: 'TIMESHEET_REJECTED', entityId: id });
+    expect(logs).toHaveLength(1);
+    expect(logs[0].metadata.reason).toBe('Please add notes');
+
+    const notifications = await Notification.find({ recipientId: employeeUser._id, type: 'TIMESHEET_REJECTED' });
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0].message).toContain('Please add notes');
+  });
+});
+
+describe('Timesheets — self-approval protection', () => {
+  test('an HR admin cannot approve or reject their own submitted timesheet', async () => {
+    const org = await createOrganization();
+    const { user: hrAdminUser, employee: hrAdminEmployee } = await createUserWithEmployee(org._id, { role: 'HR_ADMIN', joiningDate: new Date('2025-01-01') });
+    const id = await setupSubmittedTimesheetFor(org, hrAdminUser);
+
+    const approveRes = await request(app).post(`/api/timesheets/${id}/approve`).set('Authorization', authHeaderFor(hrAdminUser));
+    expect(approveRes.status).toBe(403);
+
+    const rejectRes = await request(app).post(`/api/timesheets/${id}/reject`).set('Authorization', authHeaderFor(hrAdminUser)).send({ reason: 'x' });
+    expect(rejectRes.status).toBe(403);
+
+    const stillSubmitted = await Timesheet.findById(id).lean();
+    expect(stillSubmitted.status).toBe('SUBMITTED');
   });
 });
