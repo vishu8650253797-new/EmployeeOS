@@ -8,6 +8,8 @@ const {
 const essLeaveRoutes = require('./essLeaveRoutes');
 const essAttendanceRoutes = require('./essAttendanceRoutes');
 const essHrRequestRoutes = require('./essHrRequestRoutes');
+const essTimeEntryRoutes = require('./essTimeEntryRoutes');
+const essTimesheetRoutes = require('./essTimesheetRoutes');
 
 const router = Router();
 
@@ -36,5 +38,7 @@ router.delete('/me/profile/emergency-contacts/:contactId', contactIdParam, async
 router.use('/leave', essLeaveRoutes);
 router.use('/attendance', essAttendanceRoutes);
 router.use('/requests', essHrRequestRoutes);
+router.use('/time-entries', essTimeEntryRoutes);
+router.use('/timesheets', essTimesheetRoutes);
 
 module.exports = router;

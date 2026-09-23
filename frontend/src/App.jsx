@@ -25,6 +25,7 @@ const EssDocuments = lazy(() => import('./pages/ess/EssDocuments'));
 const EssHrRequests = lazy(() => import('./pages/ess/EssHrRequests'));
 const EssHrRequestDetail = lazy(() => import('./pages/ess/EssHrRequestDetail'));
 const NotificationsPage = lazy(() => import('./pages/notifications/NotificationsPage'));
+const EssTimesheet = lazy(() => import('./pages/ess/EssTimesheet'));
 const EmployeeList = lazy(() => import('./pages/employees/EmployeeList'));
 const EmployeeForm = lazy(() => import('./pages/employees/EmployeeForm'));
 const EmployeeProfile = lazy(() => import('./pages/employees/EmployeeProfile'));
@@ -146,6 +147,7 @@ export default function App() {
                   <Route path="/ess/leave/history" element={<EssLeaveHistory />} />
                   <Route path="/ess/leave/:id" element={<EssLeaveDetail />} />
                   <Route path="/ess/attendance" element={<EssAttendance />} />
+                  <Route path="/ess/timesheet" element={<EssTimesheet />} />
                   <Route path="/ess/documents" element={<EssDocuments />} />
                   <Route path="/ess/requests" element={<EssHrRequests />} />
                   <Route path="/ess/requests/:id" element={<EssHrRequestDetail />} />

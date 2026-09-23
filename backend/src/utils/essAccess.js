@@ -16,6 +16,7 @@ const AppError = require('./AppError');
 const ESS_CAPABILITIES = [
   { key: 'profile', label: 'My Profile' },
   { key: 'attendance', label: 'Attendance' },
+  { key: 'timesheet', label: 'Timesheet' },
   { key: 'leave', label: 'Leave' },
   { key: 'payroll', label: 'Payroll' },
   { key: 'documents', label: 'Documents' },

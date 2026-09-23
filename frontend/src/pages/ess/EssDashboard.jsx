@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import {
-  UserRound, CalendarCheck, CalendarOff, Wallet, FolderOpen, ClipboardList, Bell,
+  UserRound, CalendarCheck, CalendarOff, Wallet, FolderOpen, ClipboardList, Bell, ClipboardCheck,
 } from 'lucide-react';
 import { essService } from '../../services/essService';
 import { essLeaveService } from '../../services/essLeaveService';
@@ -23,6 +23,7 @@ import { ErrorState, LoadingState } from '../../components/ui/States';
 const CAPABILITY_UI = {
   profile: { icon: UserRound, to: '/ess/profile' },
   attendance: { icon: CalendarCheck, to: '/ess/attendance' },
+  timesheet: { icon: ClipboardCheck, to: '/ess/timesheet' },
   leave: { icon: CalendarOff, to: '/ess/leave' },
   payroll: { icon: Wallet, to: '/my-payslips' },
   documents: { icon: FolderOpen, to: '/ess/documents' },

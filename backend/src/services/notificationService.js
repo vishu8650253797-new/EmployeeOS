@@ -31,6 +31,8 @@ const ENTITY_TYPE_CATEGORIES = {
   PayrollRecord: 'PAYROLL',
   EmployeeCompensation: 'PAYROLL',
   HrRequest: 'HR_REQUEST',
+  TimeEntry: 'ATTENDANCE',
+  Timesheet: 'ATTENDANCE',
 };
 
 function deriveCategory(entityType) {
