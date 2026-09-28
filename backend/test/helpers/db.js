@@ -7,6 +7,10 @@ async function connect() {
   replSet = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: 'wiredTiger' } });
   const uri = replSet.getUri();
   await mongoose.connect(uri, { dbName: 'employeeos-test' });
+  // Index creation (incl. unique/partial indexes) happens in the background
+  // by default — without waiting for it, a test asserting duplicate-key
+  // rejection can race a not-yet-built index and see a false negative.
+  await Promise.all(Object.values(mongoose.connection.models).map((m) => m.init()));
 }
 
 async function closeDatabase() {

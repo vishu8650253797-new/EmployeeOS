@@ -47,4 +47,6 @@ module.exports = {
   HrRequest: require('./HrRequest'),
   TimeEntry: require('./TimeEntry'),
   Timesheet: require('./Timesheet'),
+  Shift: require('./Shift'),
+  EmployeeSchedule: require('./EmployeeSchedule'),
 };

@@ -10,6 +10,7 @@ const essAttendanceRoutes = require('./essAttendanceRoutes');
 const essHrRequestRoutes = require('./essHrRequestRoutes');
 const essTimeEntryRoutes = require('./essTimeEntryRoutes');
 const essTimesheetRoutes = require('./essTimesheetRoutes');
+const essScheduleRoutes = require('./essScheduleRoutes');
 
 const router = Router();
 
@@ -40,5 +41,6 @@ router.use('/attendance', essAttendanceRoutes);
 router.use('/requests', essHrRequestRoutes);
 router.use('/time-entries', essTimeEntryRoutes);
 router.use('/timesheets', essTimesheetRoutes);
+router.use('/schedule', essScheduleRoutes);
 
 module.exports = router;

@@ -44,6 +44,8 @@ const payrollPeriodRoutes = require('./payrollPeriodRoutes');
 const payrollRunRoutes = require('./payrollRunRoutes');
 const payslipRoutes = require('./payslipRoutes');
 const payrollAnalyticsRoutes = require('./payrollAnalyticsRoutes');
+const shiftRoutes = require('./shiftRoutes');
+const employeeScheduleRoutes = require('./employeeScheduleRoutes');
 
 const router = Router();
 
@@ -102,5 +104,8 @@ router.use('/payroll/periods', payrollPeriodRoutes);
 router.use('/payroll/runs', payrollRunRoutes);
 router.use('/payroll/payslips', payslipRoutes);
 router.use('/payroll/analytics', payrollAnalyticsRoutes);
+
+router.use('/shifts', shiftRoutes);
+router.use('/employee-schedules', employeeScheduleRoutes);
 
 module.exports = router;
