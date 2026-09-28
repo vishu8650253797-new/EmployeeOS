@@ -20,8 +20,15 @@ const managerTimesheetsQuery = [
   query('status').optional().isIn(TIMESHEET_STATUSES).withMessage('Invalid status filter'),
   query('employeeId').optional().isMongoId().withMessage('Invalid employee ID'),
   query('periodStart').optional({ checkFalsy: true }).matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('periodStart must be YYYY-MM-DD'),
+  query('search').optional().trim().isLength({ max: 100 }).withMessage('Search must be under 100 characters'),
   query('page').optional().isInt({ min: 1 }).toInt(),
   query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
+  validate,
+];
+
+const managerTimesheetsSummaryQuery = [
+  query('periodStart').optional({ checkFalsy: true }).matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('periodStart must be YYYY-MM-DD'),
+  query('employeeId').optional().isMongoId().withMessage('Invalid employee ID'),
   validate,
 ];
 
@@ -39,4 +46,6 @@ const reopenTimesheet = [
   validate,
 ];
 
-module.exports = { timesheetsQuery, prepareTimesheet, byId, managerTimesheetsQuery, rejectTimesheet, reopenTimesheet };
+module.exports = {
+  timesheetsQuery, prepareTimesheet, byId, managerTimesheetsQuery, managerTimesheetsSummaryQuery, rejectTimesheet, reopenTimesheet,
+};

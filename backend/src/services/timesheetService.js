@@ -317,6 +317,22 @@ async function submitTimesheet(organizationId, user, id, reqMeta = {}) {
     metadata: { periodStart: updated.periodStart, periodEnd: updated.periodEnd, totalMinutes: updated.totalMinutes }, ...reqMeta,
   });
 
+  // Step 13F: this was a real gap — approve/reject/resubmit/reopen all
+  // notify someone, but a first-time submission never notified anyone.
+  // Resolves the specific direct manager via Employee.managerId (the same
+  // relationship assertManagerScope is built on) rather than broadcasting
+  // to every HR_ADMIN — there is no existing precedent in this codebase for
+  // notifying on leave/timesheet *submission* to copy verbatim (leave
+  // doesn't either), so this mirrors resubmitTimesheet's own "notify the
+  // one relevant person" shape instead.
+  emitToOrg(orgId, SOCKET_EVENTS.TIMESHEET_SUBMITTED, { timesheetId: updated._id.toString() });
+  const managerUserId = await getDirectManagerUserId(employee._id);
+  if (managerUserId) {
+    emitToUser(managerUserId, SOCKET_EVENTS.TIMESHEET_SUBMITTED, { timesheetId: updated._id.toString() });
+    await notifyEmployee(orgId, managerUserId, 'TIMESHEET_SUBMITTED', 'Timesheet submitted for review',
+      `${employee.firstName} ${employee.lastName} submitted a timesheet for ${updated.periodStart} – ${updated.periodEnd}.`, updated._id);
+  }
+
   return { ...toDTO(updated), isReadyForSubmission: false };
 }
 
@@ -418,6 +434,17 @@ async function getDirectReportIds(managerEmployeeId) {
   return reports.map((r) => r._id.toString());
 }
 
+// The inverse lookup — this employee's own direct manager's linked user
+// account, for the "notify the manager on submission" case. Returns null
+// when the employee has no manager assigned (no notification is sent in
+// that case — never a fallback broadcast).
+async function getDirectManagerUserId(employeeId) {
+  const employee = await Employee.findById(employeeId).select('managerId').lean();
+  if (!employee?.managerId) return null;
+  const manager = await Employee.findOne({ _id: employee.managerId, isDeleted: false }).select('userId').lean();
+  return manager?.userId || null;
+}
+
 async function assertManagerScope(actor, employeeId) {
   if (!MANAGER_SCOPED_ROLES.includes(actor.role)) throw new AppError('Forbidden: insufficient permissions', 403);
   if (['SUPER_ADMIN', 'HR_ADMIN'].includes(actor.role)) return;
@@ -454,13 +481,14 @@ function toManagerDTO(doc) {
   };
 }
 
-async function getManagerTimesheets(organizationId, actor, filters = {}) {
+// Shared by the list endpoint and the Step 13F reporting/summary endpoint —
+// factored out so manager-scope enforcement exists in exactly one place
+// rather than being re-derived (and risking drift) in two query builders.
+// Every branch here can only ever narrow the result set established by the
+// scope check; nothing here can expand access beyond it.
+async function buildManagerScopeQuery(organizationId, actor, filters = {}) {
   if (!MANAGER_SCOPED_ROLES.includes(actor.role)) throw new AppError('Forbidden: insufficient permissions', 403);
   const orgId = new Types.ObjectId(organizationId);
-  const pageNum = Math.max(parseInt(filters.page, 10) || DEFAULTS.page, 1);
-  const limitNum = Math.min(Math.max(parseInt(filters.limit, 10) || DEFAULTS.limit, 1), 100);
-  const skip = (pageNum - 1) * limitNum;
-
   const query = { organizationId: orgId, status: { $ne: 'DRAFT' } };
   if (filters.status) query.status = filters.status;
   if (filters.periodStart) query.periodStart = filters.periodStart;
@@ -474,15 +502,31 @@ async function getManagerTimesheets(organizationId, actor, filters = {}) {
   }
 
   if (filters.employeeId && Types.ObjectId.isValid(filters.employeeId)) {
-    // A MANAGER filtering by employeeId must still land inside their own
-    // direct-report set — this can only ever narrow results, never expand
-    // access beyond what the scoping above already established.
     if (!isUnscoped && !reportIds.includes(filters.employeeId)) {
       query.employeeId = { $in: [] }; // not one of their reports — return nothing, not an error
     } else {
       query.employeeId = new Types.ObjectId(filters.employeeId);
     }
+  } else if (filters.search && filters.search.trim()) {
+    // Employee name/code search — resolved against Employee first (never
+    // against Timesheet directly), and constrained to the same scope as
+    // everything else above before being applied.
+    const escaped = filters.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escaped, 'i');
+    const matchQuery = { organizationId: orgId, isDeleted: false, $or: [{ firstName: regex }, { lastName: regex }, { employeeId: regex }] };
+    if (!isUnscoped) matchQuery._id = { $in: reportIds.map((rid) => new Types.ObjectId(rid)) };
+    const matches = await Employee.find(matchQuery).select('_id').lean();
+    query.employeeId = { $in: matches.map((m) => m._id) };
   }
+
+  return query;
+}
+
+async function getManagerTimesheets(organizationId, actor, filters = {}) {
+  const query = await buildManagerScopeQuery(organizationId, actor, filters);
+  const pageNum = Math.max(parseInt(filters.page, 10) || DEFAULTS.page, 1);
+  const limitNum = Math.min(Math.max(parseInt(filters.limit, 10) || DEFAULTS.limit, 1), 100);
+  const skip = (pageNum - 1) * limitNum;
 
   const [docs, total] = await Promise.all([
     Timesheet.find(query)
@@ -495,6 +539,39 @@ async function getManagerTimesheets(organizationId, actor, filters = {}) {
   return {
     data: docs.map(toManagerDTO),
     pagination: { page: pageNum, limit: limitNum, total, totalPages: Math.ceil(total / limitNum) },
+  };
+}
+
+// Step 13F reporting — reuses the exact same scope/filter query as the list
+// endpoint above (buildManagerScopeQuery), so a manager's summary can never
+// diverge from what they're actually allowed to list. Deliberately excludes
+// DRAFT (same as the list endpoint) — a manager was never permitted to see
+// draft timesheets at all (loadForManager 404s on DRAFT), so a "draft count"
+// metric would leak the existence/volume of employees' unsubmitted work,
+// which the rest of this module treats as private until submission.
+// Deliberately org/team-wide only (no employee- or department-level
+// breakdown) — see the Step 13F report for why that's out of scope here.
+async function getManagerTimesheetSummary(organizationId, actor, filters = {}) {
+  const query = await buildManagerScopeQuery(organizationId, actor, filters);
+  const rows = await Timesheet.aggregate([
+    { $match: query },
+    { $group: { _id: '$status', count: { $sum: 1 }, totalMinutes: { $sum: '$totalMinutes' } } },
+  ]);
+
+  const byStatus = { SUBMITTED: 0, APPROVED: 0, REJECTED: 0 };
+  let totalMinutes = 0;
+  let totalTimesheets = 0;
+  for (const row of rows) {
+    byStatus[row._id] = row.count;
+    totalMinutes += row.totalMinutes;
+    totalTimesheets += row.count;
+  }
+
+  return {
+    totalTimesheets,
+    byStatus,
+    totalMinutes,
+    averageMinutes: totalTimesheets ? Math.round(totalMinutes / totalTimesheets) : 0,
   };
 }
 
@@ -654,6 +731,7 @@ module.exports = {
   submitTimesheet,
   resubmitTimesheet,
   getManagerTimesheets,
+  getManagerTimesheetSummary,
   getManagerTimesheetById,
   getManagerTimesheetEntries,
   approveTimesheet,

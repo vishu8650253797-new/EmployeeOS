@@ -915,3 +915,120 @@ describe('Timesheets — review history', () => {
     expect(actions).not.toContain('TIMESHEET_REJECTED');
   });
 });
+
+// ---- Notifications on submission (Step 13F — this was a real gap) ---------
+
+describe('Timesheets — submission notification (Step 13F)', () => {
+  test('the direct manager is notified when an employee submits a timesheet', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    await setupSubmittedTimesheetFor(org, employeeUser);
+
+    const notifications = await Notification.find({ recipientId: managerUser._id, type: 'TIMESHEET_SUBMITTED' });
+    expect(notifications).toHaveLength(1);
+  });
+
+  test('no notification is sent (and nothing crashes) when the employee has no manager assigned', async () => {
+    const org = await createOrganization();
+    const { user: employeeUser } = await createUserWithEmployee(org._id, { joiningDate: new Date('2025-01-01') }); // no managerId
+    const res = await request(app).post('/api/ess/time-entries/start').set('Authorization', authHeaderFor(employeeUser));
+    await request(app).post(`/api/ess/time-entries/${res.body.data.id}/end`).set('Authorization', authHeaderFor(employeeUser)).send({ notes: 'x' });
+    const prepared = await request(app).post('/api/ess/timesheets/prepare').set('Authorization', authHeaderFor(employeeUser));
+
+    const submitRes = await request(app).post(`/api/ess/timesheets/${prepared.body.data.id}/submit`).set('Authorization', authHeaderFor(employeeUser));
+    expect(submitRes.status).toBe(200);
+
+    const notifications = await Notification.find({ type: 'TIMESHEET_SUBMITTED' });
+    expect(notifications).toHaveLength(0);
+  });
+});
+
+// ---- Manager reporting / summary (Step 13F) --------------------------------
+
+describe('Timesheets — manager reporting summary', () => {
+  test('summary reflects counts and total minutes across the manager\'s scope, excluding drafts', async () => {
+    const org = await createOrganization();
+    const { managerUser, managerEmployee, employeeUser } = await setupManagerAndReport(org);
+    await setupSubmittedTimesheetFor(org, employeeUser);
+
+    // a second employee under the same manager, left in DRAFT — must not appear
+    const { user: employeeUser2 } = await createUserWithEmployee(org._id, { managerId: managerEmployee._id, joiningDate: new Date('2025-01-01') });
+    await request(app).post('/api/ess/timesheets/prepare').set('Authorization', authHeaderFor(employeeUser2));
+
+    const res = await request(app).get('/api/timesheets/summary').set('Authorization', authHeaderFor(managerUser));
+    expect(res.status).toBe(200);
+    expect(res.body.data.totalTimesheets).toBe(1); // the DRAFT one is excluded
+    expect(res.body.data.byStatus.SUBMITTED).toBe(1);
+    expect(res.body.data.totalMinutes).toBeGreaterThanOrEqual(0);
+  });
+
+  test('an unrelated manager\'s summary does not include another manager\'s team', async () => {
+    const org = await createOrganization();
+    const { employeeUser } = await setupManagerAndReport(org);
+    await setupSubmittedTimesheetFor(org, employeeUser);
+    const { managerUser: unrelatedManager } = await setupManagerAndReport(org);
+
+    const res = await request(app).get('/api/timesheets/summary').set('Authorization', authHeaderFor(unrelatedManager));
+    expect(res.body.data.totalTimesheets).toBe(0);
+  });
+
+  test('a plain employee cannot access the summary endpoint', async () => {
+    const org = await createOrganization();
+    const { employeeUser } = await setupManagerAndReport(org);
+    const res = await request(app).get('/api/timesheets/summary').set('Authorization', authHeaderFor(employeeUser));
+    expect(res.status).toBe(403);
+  });
+
+  test('HR_ADMIN (unscoped) sees organization-wide totals across multiple managers', async () => {
+    const org = await createOrganization();
+    const { employeeUser: emp1 } = await setupManagerAndReport(org);
+    await setupSubmittedTimesheetFor(org, emp1);
+    const { employeeUser: emp2 } = await setupManagerAndReport(org);
+    await setupSubmittedTimesheetFor(org, emp2);
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+
+    const res = await request(app).get('/api/timesheets/summary').set('Authorization', authHeaderFor(hrAdmin));
+    expect(res.body.data.totalTimesheets).toBe(2);
+  });
+
+  test('the summary endpoint cannot be widened via a spoofed organizationId or employeeId query param', async () => {
+    const orgA = await createOrganization();
+    const { employeeUser } = await setupManagerAndReport(orgA);
+    await setupSubmittedTimesheetFor(orgA, employeeUser);
+
+    const orgB = await createOrganization();
+    const { managerUser: managerB } = await setupManagerAndReport(orgB);
+
+    const res = await request(app)
+      .get('/api/timesheets/summary')
+      .query({ organizationId: orgA._id.toString() })
+      .set('Authorization', authHeaderFor(managerB));
+    expect(res.body.data.totalTimesheets).toBe(0); // still scoped to orgB, the spoofed param is ignored
+  });
+});
+
+// ---- Manager list search (Step 13F) ----------------------------------------
+
+describe('Timesheets — manager list search', () => {
+  test('a manager can search their team by employee name', async () => {
+    const org = await createOrganization();
+    const { managerEmployee, managerUser } = await setupManagerAndReport(org);
+    const { user: employeeUser } = await createUserWithEmployee(org._id, { firstName: 'Zendaya', lastName: 'Searchable', managerId: managerEmployee._id, joiningDate: new Date('2025-01-01') });
+    await setupSubmittedTimesheetFor(org, employeeUser);
+
+    const res = await request(app).get('/api/timesheets').query({ search: 'zendaya' }).set('Authorization', authHeaderFor(managerUser));
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].employee.firstName).toBe('Zendaya');
+  });
+
+  test('search cannot surface an employee outside the manager\'s scope', async () => {
+    const org = await createOrganization();
+    const { managerUser } = await setupManagerAndReport(org);
+    const { user: unrelatedEmployeeUser } = await createUserWithEmployee(org._id, { firstName: 'Outside', lastName: 'Scope', joiningDate: new Date('2025-01-01') });
+    await setupSubmittedTimesheetFor(org, unrelatedEmployeeUser);
+
+    const res = await request(app).get('/api/timesheets').query({ search: 'Outside' }).set('Authorization', authHeaderFor(managerUser));
+    expect(res.body.data).toHaveLength(0);
+  });
+});

@@ -82,7 +82,12 @@ const timesheetSchema = new Schema(
 // this, so retrying preparation is always safe and never creates duplicates.
 timesheetSchema.index({ organizationId: 1, employeeId: 1, periodStart: 1 }, { unique: true });
 timesheetSchema.index({ organizationId: 1, employeeId: 1, periodStart: -1 });
-timesheetSchema.index({ organizationId: 1, status: 1 });
+// Step 13F: replaces the old {organizationId, status} index — this compound
+// index still serves every query the old one did (Mongo can use a leading
+// prefix of a compound index) and additionally covers the manager
+// list/summary endpoints' actual sort (submittedAt: -1), which the old
+// 2-field index couldn't satisfy without an in-memory sort.
+timesheetSchema.index({ organizationId: 1, status: 1, submittedAt: -1 });
 
 timesheetSchema.set('toJSON', {
   transform: (doc, ret) => {

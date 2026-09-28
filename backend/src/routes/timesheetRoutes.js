@@ -3,17 +3,22 @@ const authMiddleware = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/roleMiddleware');
 const asyncHandler = require('../utils/asyncHandler');
 const timesheetController = require('../controllers/timesheetController');
-const { managerTimesheetsQuery, rejectTimesheet, reopenTimesheet, byId } = require('../validators/timesheetValidator');
+const {
+  managerTimesheetsQuery, managerTimesheetsSummaryQuery, rejectTimesheet, reopenTimesheet, byId,
+} = require('../validators/timesheetValidator');
 
 const router = Router();
 
-// Manager/HR review surface (Steps 13D/13E) — role-gated the same way
+// Manager/HR review surface (Steps 13D/13E/13F) — role-gated the same way
 // leaveRequestRoutes.js gates leave approval; fine-grained "is this actually
 // their direct report" scoping happens inside timesheetService via
 // assertManagerScope, not here.
 router.use(authMiddleware);
 router.use(authorize('SUPER_ADMIN', 'HR_ADMIN', 'MANAGER'));
 
+// /summary must be registered before /:id or it would be swallowed by the
+// :id param route (same lesson as payslipRoutes.js's /me/overview).
+router.get('/summary', managerTimesheetsSummaryQuery, asyncHandler(timesheetController.getTimesheetsSummary));
 router.get('/', managerTimesheetsQuery, asyncHandler(timesheetController.getTimesheets));
 router.get('/:id', byId, asyncHandler(timesheetController.getTimesheetById));
 router.get('/:id/entries', byId, asyncHandler(timesheetController.getTimesheetEntries));

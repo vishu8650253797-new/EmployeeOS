@@ -6,6 +6,11 @@ export const managerTimesheetService = {
     return data;
   },
 
+  async getSummary(params = {}) {
+    const { data } = await api.get('/timesheets/summary', { params });
+    return data.data;
+  },
+
   async getById(id) {
     const { data } = await api.get(`/timesheets/${id}`);
     return data.data;

@@ -8,6 +8,11 @@ exports.getTimesheets = async (req, res) => {
   res.json({ success: true, data, pagination });
 };
 
+exports.getTimesheetsSummary = async (req, res) => {
+  const data = await timesheetService.getManagerTimesheetSummary(req.organizationId, req.user, req.query);
+  res.json({ success: true, data });
+};
+
 exports.getTimesheetById = async (req, res) => {
   const data = await timesheetService.getManagerTimesheetById(req.organizationId, req.user, req.params.id);
   res.json({ success: true, data });

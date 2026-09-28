@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ClipboardCheck, Check, X, Eye, RotateCcw } from 'lucide-react';
 import { managerTimesheetService } from '../../services/managerTimesheetService';
 import { useFetch } from '../../hooks/useFetch';
@@ -12,15 +12,17 @@ import Input from '../../components/ui/Input';
 import Modal from '../../components/ui/Modal';
 import Avatar from '../../components/ui/Avatar';
 import Tabs from '../../components/ui/Tabs';
+import SearchInput from '../../components/ui/SearchInput';
 import { StatusBadge } from '../../components/ui/Badge';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import Tooltip from '../../components/ui/Tooltip';
 import Pagination from '../../components/ui/Pagination';
-import { TableSkeleton } from '../../components/ui/Skeleton';
+import { StatCardSkeleton, TableSkeleton } from '../../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../../components/ui/States';
 import { TableContainer, Table, THead, TH, TBody, TR, TD } from '../../components/ui/Table';
 
 const PAGE_SIZE = 15;
+const DEBOUNCE_MS = 300;
 
 function formatMinutes(minutes = 0) {
   const h = Math.floor(minutes / 60);
@@ -310,22 +312,40 @@ export default function ManagerTimesheets() {
   const [statusFilter, setStatusFilter] = useState('SUBMITTED');
   const [page, setPage] = useState(1);
   const [detailId, setDetailId] = useState(null);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(search.trim()), DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [search]);
 
   const { data, loading, error, refetch } = useFetch(
-    () => managerTimesheetService.getTimesheets({ status: statusFilter, page, limit: PAGE_SIZE }),
-    [statusFilter, page]
+    () => managerTimesheetService.getTimesheets({ status: statusFilter, search: debouncedSearch || undefined, page, limit: PAGE_SIZE }),
+    [statusFilter, debouncedSearch, page]
   );
   const timesheets = data?.data || [];
   const pagination = data?.pagination || { page: 1, total: 0 };
 
-  useSocketEvent(SOCKET_EVENTS.TIMESHEET_APPROVED, refetch, [refetch]);
-  useSocketEvent(SOCKET_EVENTS.TIMESHEET_REJECTED, refetch, [refetch]);
-  useSocketEvent(SOCKET_EVENTS.TIMESHEET_RESUBMITTED, refetch, [refetch]);
-  useSocketEvent(SOCKET_EVENTS.TIMESHEET_REOPENED, refetch, [refetch]);
+  const { data: summary, loading: summaryLoading, refetch: refetchSummary } = useFetch(
+    () => managerTimesheetService.getSummary(),
+    []
+  );
+
+  function refreshAll() {
+    refetch();
+    refetchSummary();
+  }
+
+  useSocketEvent(SOCKET_EVENTS.TIMESHEET_SUBMITTED, refreshAll, [refetch, refetchSummary]);
+  useSocketEvent(SOCKET_EVENTS.TIMESHEET_APPROVED, refreshAll, [refetch, refetchSummary]);
+  useSocketEvent(SOCKET_EVENTS.TIMESHEET_REJECTED, refreshAll, [refetch, refetchSummary]);
+  useSocketEvent(SOCKET_EVENTS.TIMESHEET_RESUBMITTED, refreshAll, [refetch, refetchSummary]);
+  useSocketEvent(SOCKET_EVENTS.TIMESHEET_REOPENED, refreshAll, [refetch, refetchSummary]);
 
   function handleDecision() {
     setDetailId(null);
-    refetch();
+    refreshAll();
   }
 
   const tabs = [
@@ -338,7 +358,28 @@ export default function ManagerTimesheets() {
     <div>
       <PageHeader title="Timesheets" subtitle="Review and approve your team's submitted timesheets" />
 
-      <Tabs tabs={tabs} active={statusFilter} onChange={(v) => { setStatusFilter(v); setPage(1); }} className="mb-4" />
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {summaryLoading ? (
+          Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)
+        ) : (
+          [
+            { label: 'Total timesheets', value: summary?.totalTimesheets ?? 0 },
+            { label: 'Pending review', value: summary?.byStatus?.SUBMITTED ?? 0 },
+            { label: 'Approved', value: summary?.byStatus?.APPROVED ?? 0 },
+            { label: 'Total hours', value: formatMinutes(summary?.totalMinutes ?? 0) },
+          ].map((cell) => (
+            <div key={cell.label} className="rounded-xl border border-line bg-surface p-4 shadow-card">
+              <p className="text-[13px] text-ink-500">{cell.label}</p>
+              <p className="mt-1.5 text-xl font-semibold tracking-tight text-ink-900">{cell.value}</p>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Tabs tabs={tabs} active={statusFilter} onChange={(v) => { setStatusFilter(v); setPage(1); }} />
+        <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search by employee name or ID…" className="sm:max-w-xs" />
+      </div>
 
       <TableContainer>
         {loading ? (
@@ -349,7 +390,11 @@ export default function ManagerTimesheets() {
           <EmptyState
             icon={ClipboardCheck}
             title="Nothing here"
-            message={statusFilter === 'SUBMITTED' ? 'No timesheets are waiting for your review.' : `No ${statusFilter.toLowerCase()} timesheets yet.`}
+            message={
+              debouncedSearch
+                ? `No results for "${debouncedSearch}".`
+                : statusFilter === 'SUBMITTED' ? 'No timesheets are waiting for your review.' : `No ${statusFilter.toLowerCase()} timesheets yet.`
+            }
           />
         ) : (
           <>
