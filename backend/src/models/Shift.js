@@ -60,7 +60,11 @@ shiftSchema.pre('validate', function computeDerivedFields() {
   const endMin = timeToMinutes(this.endTime);
   this.isOvernight = endMin <= startMin;
   const rawMinutes = this.isOvernight ? (24 * 60 - startMin) + endMin : endMin - startMin;
-  this.scheduledMinutes = Math.max(0, rawMinutes - (this.breakMinutes || 0));
+  if ((this.breakMinutes || 0) > rawMinutes) {
+    this.invalidate('breakMinutes', "Break duration cannot exceed the shift's working duration");
+    return;
+  }
+  this.scheduledMinutes = rawMinutes - (this.breakMinutes || 0);
 });
 
 // Code unique per organization (partial: only among non-deleted shifts, so

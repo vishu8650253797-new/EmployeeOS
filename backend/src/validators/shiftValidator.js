@@ -3,7 +3,11 @@ const { validate } = require('./index');
 const { SHIFT_STATUSES, TIME_PATTERN } = require('../models/Shift');
 
 const shiftsQuery = [
-  query('status').optional().isIn(SHIFT_STATUSES).withMessage('Invalid status filter'),
+  // checkFalsy: the frontend sends `status=''`/`search=''` for "no filter"
+  // (mirrors AssetInventory.jsx's convention) rather than omitting the
+  // param entirely — plain .optional() only skips undefined, not ''.
+  query('status').optional({ checkFalsy: true }).isIn(SHIFT_STATUSES).withMessage('Invalid status filter'),
+  query('search').optional({ checkFalsy: true }).trim().isLength({ max: 100 }),
   query('page').optional().isInt({ min: 1 }).toInt(),
   query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
   validate,

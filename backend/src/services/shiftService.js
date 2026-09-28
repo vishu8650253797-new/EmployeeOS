@@ -1,5 +1,5 @@
 const { Types } = require('mongoose');
-const { Shift } = require('../models');
+const { Shift, EmployeeSchedule } = require('../models');
 const AppError = require('../utils/AppError');
 const auditLogService = require('./auditLogService');
 
@@ -17,6 +17,15 @@ async function getShifts(organizationId, filters = {}) {
 
   const query = { organizationId: orgId, isDeleted: false };
   if (filters.status) query.status = filters.status;
+
+  if (filters.search && filters.search.trim()) {
+    // Escaped the same way as timesheetService's employee-name search
+    // (Step 13F) — user-supplied text must never be interpolated into a
+    // $regex unescaped.
+    const escaped = filters.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escaped, 'i');
+    query.$or = [{ name: regex }, { code: regex }, { description: regex }];
+  }
 
   const [data, total] = await Promise.all([
     Shift.find(query).sort({ name: 1 }).skip(skip).limit(limitNum).lean(),
@@ -108,4 +117,33 @@ async function setShiftStatus(organizationId, id, status, user, reqMeta = {}) {
   return toDTO(shift.toObject());
 }
 
-module.exports = { getShifts, getShiftById, createShift, updateShift, setShiftStatus };
+async function archiveShift(organizationId, id, user, reqMeta = {}) {
+  const orgId = new Types.ObjectId(organizationId);
+  const shift = await Shift.findOne({ _id: id, organizationId: orgId, isDeleted: false });
+  if (!shift) throw new AppError('Shift not found', 404);
+
+  // Mirrors departmentService.deleteDepartment's guard — a shift still
+  // actively assigned to employees cannot be archived out from under them.
+  // Historical (SUPERSEDED/CANCELLED) assignments don't block this, since
+  // the shift is never physically deleted and remains resolvable by id.
+  const activeAssignmentCount = await EmployeeSchedule.countDocuments({
+    organizationId: orgId, shiftId: shift._id, status: 'ACTIVE',
+  });
+  if (activeAssignmentCount > 0) {
+    throw new AppError('This shift has active employee schedule assignments. Reassign or cancel them before archiving.', 409);
+  }
+
+  shift.isDeleted = true;
+  shift.status = 'INACTIVE';
+  shift.updatedBy = user._id;
+  await shift.save();
+
+  await auditLogService.recordAction({
+    organizationId: orgId, userId: user._id, action: 'SHIFT_ARCHIVED', entityType: 'Shift', entityId: shift._id,
+    metadata: { code: shift.code }, ...reqMeta,
+  });
+
+  return { success: true, message: 'Shift archived' };
+}
+
+module.exports = { getShifts, getShiftById, createShift, updateShift, setShiftStatus, archiveShift };

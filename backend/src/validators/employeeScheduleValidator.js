@@ -3,8 +3,8 @@ const { validate } = require('./index');
 const { SCHEDULE_STATUSES } = require('../models/EmployeeSchedule');
 
 const schedulesQuery = [
-  query('status').optional().isIn(SCHEDULE_STATUSES).withMessage('Invalid status filter'),
-  query('employeeId').optional().isMongoId().withMessage('Invalid employee ID'),
+  query('status').optional({ checkFalsy: true }).isIn(SCHEDULE_STATUSES).withMessage('Invalid status filter'),
+  query('employeeId').optional({ checkFalsy: true }).isMongoId().withMessage('Invalid employee ID'),
   query('page').optional().isInt({ min: 1 }).toInt(),
   query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
   validate,

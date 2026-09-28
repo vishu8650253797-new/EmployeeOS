@@ -1,7 +1,7 @@
 const request = require('supertest');
 const app = require('../src/app');
 const { connect, closeDatabase, clearDatabase } = require('./helpers/db');
-const { createOrganization, createUser, authHeaderFor } = require('./helpers/factories');
+const { createOrganization, createUser, createUserWithEmployee, authHeaderFor } = require('./helpers/factories');
 const { Shift } = require('../src/models');
 
 jest.setTimeout(30000);
@@ -169,5 +169,107 @@ describe('Shift definitions — CRUD, RBAC, org isolation', () => {
     const stored = await Shift.findById(res.body.data.id).lean();
     expect(stored.organizationId.toString()).toBe(orgA._id.toString());
     expect(stored.createdBy.toString()).toBe(hrAdmin._id.toString());
+  });
+
+  test('rejects a break duration longer than the shift\'s working duration', async () => {
+    const org = await createOrganization();
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+
+    const res = await request(app)
+      .post('/api/shifts')
+      .set('Authorization', authHeaderFor(hrAdmin))
+      .send(shiftPayload({ startTime: '09:00', endTime: '10:00', breakMinutes: 90 }));
+
+    expect(res.status).toBe(400);
+  });
+
+  test('search filters shifts by name, code, or description', async () => {
+    const org = await createOrganization();
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+    await request(app).post('/api/shifts').set('Authorization', authHeaderFor(hrAdmin))
+      .send(shiftPayload({ name: 'Early Bird', code: 'EARLY' }));
+    await request(app).post('/api/shifts').set('Authorization', authHeaderFor(hrAdmin))
+      .send(shiftPayload({ name: 'Night Owl', code: 'NIGHT', startTime: '22:00', endTime: '06:00' }));
+
+    const res = await request(app)
+      .get('/api/shifts')
+      .query({ search: 'early' })
+      .set('Authorization', authHeaderFor(hrAdmin));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].code).toBe('EARLY');
+  });
+
+  test('search input is safely escaped, not evaluated as a regex', async () => {
+    const org = await createOrganization();
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+    await request(app).post('/api/shifts').set('Authorization', authHeaderFor(hrAdmin)).send(shiftPayload());
+
+    const res = await request(app)
+      .get('/api/shifts')
+      .query({ search: '(unclosed' })
+      .set('Authorization', authHeaderFor(hrAdmin));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(0);
+  });
+
+  test('archiving a shift with no active assignments soft-deletes it', async () => {
+    const org = await createOrganization();
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+    const created = await request(app).post('/api/shifts').set('Authorization', authHeaderFor(hrAdmin)).send(shiftPayload());
+
+    const res = await request(app)
+      .delete(`/api/shifts/${created.body.data.id}`)
+      .set('Authorization', authHeaderFor(hrAdmin));
+
+    expect(res.status).toBe(200);
+    const stored = await Shift.findById(created.body.data.id).lean();
+    expect(stored.isDeleted).toBe(true);
+    expect(stored.status).toBe('INACTIVE');
+
+    const listRes = await request(app).get('/api/shifts').set('Authorization', authHeaderFor(hrAdmin));
+    expect(listRes.body.data).toHaveLength(0);
+  });
+
+  test('a shift code can be reused after the original is archived', async () => {
+    const org = await createOrganization();
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+    const created = await request(app).post('/api/shifts').set('Authorization', authHeaderFor(hrAdmin)).send(shiftPayload());
+    await request(app).delete(`/api/shifts/${created.body.data.id}`).set('Authorization', authHeaderFor(hrAdmin));
+
+    const res = await request(app).post('/api/shifts').set('Authorization', authHeaderFor(hrAdmin)).send(shiftPayload());
+    expect(res.status).toBe(201);
+  });
+
+  test('archiving is blocked while an employee has an active schedule on this shift', async () => {
+    const org = await createOrganization();
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+    const { employee } = await createUserWithEmployee(org._id, { role: 'EMPLOYEE' });
+    const created = await request(app).post('/api/shifts').set('Authorization', authHeaderFor(hrAdmin)).send(shiftPayload());
+    await request(app)
+      .post('/api/employee-schedules')
+      .set('Authorization', authHeaderFor(hrAdmin))
+      .send({ employeeId: employee._id.toString(), shiftId: created.body.data.id, effectiveFrom: '2026-01-01' });
+
+    const res = await request(app)
+      .delete(`/api/shifts/${created.body.data.id}`)
+      .set('Authorization', authHeaderFor(hrAdmin));
+
+    expect(res.status).toBe(409);
+  });
+
+  test('a plain employee cannot archive a shift', async () => {
+    const org = await createOrganization();
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+    const employeeUser = await createUser(org._id, { role: 'EMPLOYEE' });
+    const created = await request(app).post('/api/shifts').set('Authorization', authHeaderFor(hrAdmin)).send(shiftPayload());
+
+    const res = await request(app)
+      .delete(`/api/shifts/${created.body.data.id}`)
+      .set('Authorization', authHeaderFor(employeeUser));
+
+    expect(res.status).toBe(403);
   });
 });

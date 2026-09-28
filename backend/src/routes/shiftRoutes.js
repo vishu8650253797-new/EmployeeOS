@@ -19,5 +19,6 @@ router.post('/', createShift, asyncHandler(shiftController.createShift));
 router.get('/:id', byId, asyncHandler(shiftController.getShiftById));
 router.put('/:id', updateShift, asyncHandler(shiftController.updateShift));
 router.patch('/:id/status', setShiftStatus, asyncHandler(shiftController.setShiftStatus));
+router.delete('/:id', byId, asyncHandler(shiftController.archiveShift));
 
 module.exports = router;

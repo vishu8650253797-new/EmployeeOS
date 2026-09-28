@@ -27,3 +27,8 @@ exports.setShiftStatus = async (req, res) => {
   const data = await shiftService.setShiftStatus(req.organizationId, req.params.id, req.body.status, req.user, reqMeta(req));
   res.json({ success: true, message: 'Shift status updated', data });
 };
+
+exports.archiveShift = async (req, res) => {
+  const result = await shiftService.archiveShift(req.organizationId, req.params.id, req.user, reqMeta(req));
+  res.json(result);
+};
