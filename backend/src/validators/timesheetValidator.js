@@ -31,4 +31,12 @@ const rejectTimesheet = [
   validate,
 ];
 
-module.exports = { timesheetsQuery, prepareTimesheet, byId, managerTimesheetsQuery, rejectTimesheet };
+// Same shape as rejectTimesheet (a mandatory reason) — reopening an approved
+// timesheet is functionally the same action with a different starting status.
+const reopenTimesheet = [
+  param('id').isMongoId().withMessage('Invalid timesheet ID'),
+  body('reason').trim().notEmpty().withMessage('A reason is required to reopen a timesheet').isLength({ max: 1000 }).withMessage('Reason must be under 1000 characters'),
+  validate,
+];
+
+module.exports = { timesheetsQuery, prepareTimesheet, byId, managerTimesheetsQuery, rejectTimesheet, reopenTimesheet };

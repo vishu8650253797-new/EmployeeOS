@@ -1,5 +1,5 @@
 const { Types } = require('mongoose');
-const { Timesheet, TimeEntry, Employee } = require('../models');
+const { Timesheet, TimeEntry, Employee, AuditLog } = require('../models');
 const { LOCKED_STATUSES } = require('../models/Timesheet');
 const AppError = require('../utils/AppError');
 const essAccess = require('../utils/essAccess');
@@ -170,11 +170,14 @@ async function prepareTimesheet(organizationId, user, payload = {}, reqMeta = {}
   return { ...toDTO(timesheet.toObject()), isReadyForSubmission: snapshot.isReadyForSubmission };
 }
 
-// Re-reads and re-validates a DRAFT from live entries on every view, so the
-// displayed readiness state is never stale — a SUBMITTED timesheet is
-// returned as-is (its snapshot is frozen).
-async function refreshIfDraft(timesheet) {
-  if (timesheet.status !== 'DRAFT') {
+// Re-reads and re-validates a DRAFT or REJECTED timesheet from live entries
+// on every view, so the displayed readiness state is never stale — REJECTED
+// is included because that's the employee's correction window (see
+// resubmitTimesheet): they may still have an open time entry to close out,
+// or may clock a new one for a day still within the period, before
+// resubmitting. SUBMITTED/APPROVED are returned as-is (frozen snapshot).
+async function refreshIfEditable(timesheet) {
+  if (timesheet.status !== 'DRAFT' && timesheet.status !== 'REJECTED') {
     return { ...toDTO(timesheet), isReadyForSubmission: false };
   }
   const entries = await getEntriesForPeriod(timesheet.organizationId, timesheet.employeeId, timesheet.periodStart, timesheet.periodEnd);
@@ -187,6 +190,24 @@ async function refreshIfDraft(timesheet) {
     validationWarnings: snapshot.validationWarnings,
     isReadyForSubmission: snapshot.isReadyForSubmission,
   };
+}
+
+// Review history, reusing the existing AuditLog rather than a second,
+// duplicate history mechanism — every lifecycle transition this service
+// performs already calls auditLogService.recordAction, so this is purely a
+// read/projection over data that already exists.
+const HISTORY_ACTIONS = ['TIMESHEET_SUBMITTED', 'TIMESHEET_APPROVED', 'TIMESHEET_REJECTED', 'TIMESHEET_RESUBMITTED', 'TIMESHEET_REOPENED'];
+async function getTimesheetHistory(organizationId, timesheetId) {
+  const logs = await AuditLog.find({
+    organizationId: new Types.ObjectId(organizationId), entityType: 'Timesheet', entityId: timesheetId, action: { $in: HISTORY_ACTIONS },
+  }).populate('userId', 'firstName lastName').sort({ createdAt: 1 }).lean();
+
+  return logs.map((log) => ({
+    action: log.action,
+    actor: log.userId ? { firstName: log.userId.firstName, lastName: log.userId.lastName } : null,
+    at: log.createdAt,
+    reason: log.metadata?.reason,
+  }));
 }
 
 async function getMyTimesheets(organizationId, user, filters = {}) {
@@ -221,7 +242,7 @@ async function getCurrentTimesheet(organizationId, user) {
 
   return {
     period: { periodStart, periodEnd, timezone: timeZone },
-    timesheet: timesheet ? await refreshIfDraft(timesheet) : null,
+    timesheet: timesheet ? await refreshIfEditable(timesheet) : null,
   };
 }
 
@@ -231,7 +252,8 @@ async function getMyTimesheetById(organizationId, user, id) {
     _id: id, organizationId: new Types.ObjectId(organizationId), employeeId: employee._id,
   }).populate('reviewedBy', 'firstName lastName').lean();
   if (!timesheet) throw new AppError('Timesheet not found', 404);
-  return refreshIfDraft(timesheet);
+  const [dto, history] = await Promise.all([refreshIfEditable(timesheet), getTimesheetHistory(organizationId, timesheet._id)]);
+  return { ...dto, history };
 }
 
 // The daily breakdown for a period — used by the review UI. Ownership is
@@ -294,6 +316,71 @@ async function submitTimesheet(organizationId, user, id, reqMeta = {}) {
     organizationId: orgId, userId: user._id, action: 'TIMESHEET_SUBMITTED', entityType: 'Timesheet', entityId: updated._id,
     metadata: { periodStart: updated.periodStart, periodEnd: updated.periodEnd, totalMinutes: updated.totalMinutes }, ...reqMeta,
   });
+
+  return { ...toDTO(updated), isReadyForSubmission: false };
+}
+
+// Correction & resubmission (Step 13E). There is no separate "edit a time
+// entry" or "CORRECTED" status here — per Step 13B, TimeEntry has no edit
+// endpoint, and per this file's own convention (see the model file's
+// header comment) a new status isn't introduced where an existing one
+// already does the job. "Correcting" a REJECTED timesheet means: the
+// employee may still clock new entries for the period via the unchanged
+// Step 13A/13B start/end endpoints, and every GET of this timesheet
+// (refreshIfEditable above) already re-validates against whatever entries
+// exist now. resubmitTimesheet is just the REJECTED -> SUBMITTED transition
+// once that live snapshot is finally ready.
+async function resubmitTimesheet(organizationId, user, id, reqMeta = {}) {
+  const employee = await essAccess.resolveSelfEmployee(user, organizationId);
+  const orgId = new Types.ObjectId(organizationId);
+
+  const timesheet = await Timesheet.findOne({ _id: id, organizationId: orgId, employeeId: employee._id });
+  if (!timesheet) throw new AppError('Timesheet not found', 404);
+  if (timesheet.status !== 'REJECTED') throw new AppError('Only a rejected timesheet can be resubmitted', 409);
+
+  const entries = await getEntriesForPeriod(orgId, employee._id, timesheet.periodStart, timesheet.periodEnd);
+  const snapshot = buildSnapshot(entries);
+  if (!snapshot.isReadyForSubmission) {
+    throw new AppError('This timesheet still has unresolved errors and cannot be resubmitted', 422);
+  }
+
+  // The reviewer this resubmission is headed back to, captured before the
+  // update clears the field — needed for the "notify the reviewer" step.
+  const priorReviewerId = timesheet.reviewedBy;
+
+  const updated = await Timesheet.findOneAndUpdate(
+    { _id: id, organizationId: orgId, employeeId: employee._id, status: 'REJECTED' },
+    {
+      $set: {
+        status: 'SUBMITTED',
+        submittedAt: new Date(),
+        totalMinutes: snapshot.totalMinutes,
+        entryCount: snapshot.entryCount,
+        validationErrors: [],
+        validationWarnings: snapshot.validationWarnings,
+        timeEntryIds: entries.map((e) => e._id),
+        updatedBy: user._id,
+      },
+      // The prior decision no longer describes the current (fresh) review
+      // cycle — its record is preserved in AuditLog/history, not lost.
+      $unset: { reviewedBy: '', reviewedAt: '', rejectionReason: '' },
+    },
+    { new: true }
+  ).lean();
+
+  if (!updated) throw new AppError('Only a rejected timesheet can be resubmitted', 409);
+
+  await auditLogService.recordAction({
+    organizationId: orgId, userId: user._id, action: 'TIMESHEET_RESUBMITTED', entityType: 'Timesheet', entityId: updated._id,
+    metadata: { periodStart: updated.periodStart, periodEnd: updated.periodEnd, totalMinutes: updated.totalMinutes }, ...reqMeta,
+  });
+
+  emitToOrg(orgId, SOCKET_EVENTS.TIMESHEET_RESUBMITTED, { timesheetId: updated._id.toString() });
+  if (priorReviewerId) {
+    emitToUser(priorReviewerId, SOCKET_EVENTS.TIMESHEET_RESUBMITTED, { timesheetId: updated._id.toString() });
+    await notifyEmployee(orgId, priorReviewerId, 'TIMESHEET_RESUBMITTED', 'Timesheet resubmitted',
+      `${employee.firstName} ${employee.lastName} resubmitted their timesheet for ${updated.periodStart} – ${updated.periodEnd}.`, updated._id);
+  }
 
   return { ...toDTO(updated), isReadyForSubmission: false };
 }
@@ -424,7 +511,8 @@ async function loadForManager(organizationId, actor, id) {
 
 async function getManagerTimesheetById(organizationId, actor, id) {
   const timesheet = await loadForManager(organizationId, actor, id);
-  return toManagerDTO(timesheet.toObject());
+  const history = await getTimesheetHistory(organizationId, timesheet._id);
+  return { ...toManagerDTO(timesheet.toObject()), history };
 }
 
 async function getManagerTimesheetEntries(organizationId, actor, id) {
@@ -506,6 +594,47 @@ async function rejectTimesheet(organizationId, actor, id, reason, reqMeta = {}) 
   return toManagerDTO({ ...updated, employeeId: timesheet.employeeId });
 }
 
+// Reopening an APPROVED timesheet (Step 13E) is, functionally, a manager
+// sending it back to the employee with a reason — the exact same shape and
+// fields as an ordinary rejection (reviewedBy/reviewedAt/rejectionReason,
+// status -> REJECTED). What distinguishes "reopened" from "rejected at
+// first review" is only the audit action name (TIMESHEET_REOPENED), which
+// getTimesheetHistory surfaces distinctly. No new status or schema field —
+// see the model file's header comment for why. Reuses the exact same
+// manager-scope/self-review guards as approve/reject (Step 13D) rather than
+// a separate authorization system.
+async function reopenTimesheet(organizationId, actor, id, reason, reqMeta = {}) {
+  if (!reason || !reason.trim()) throw new AppError('A reason is required to reopen a timesheet', 400);
+  const orgId = new Types.ObjectId(organizationId);
+  const timesheet = await loadForManager(organizationId, actor, id);
+  assertNotSelf(actor, timesheet.employeeId);
+  if (timesheet.status !== 'APPROVED') throw new AppError(`Only an approved timesheet can be reopened (this one is ${timesheet.status.toLowerCase()})`, 409);
+
+  const trimmedReason = reason.trim();
+
+  const updated = await Timesheet.findOneAndUpdate(
+    { _id: id, organizationId: orgId, status: 'APPROVED' },
+    { $set: { status: 'REJECTED', reviewedBy: actor._id, reviewedAt: new Date(), rejectionReason: trimmedReason, updatedBy: actor._id } },
+    { new: true }
+  ).populate('reviewedBy', 'firstName lastName').lean();
+
+  if (!updated) throw new AppError('This timesheet is no longer approved and cannot be reopened', 409);
+
+  await auditLogService.recordAction({
+    organizationId: orgId, userId: actor._id, action: 'TIMESHEET_REOPENED', entityType: 'Timesheet', entityId: updated._id,
+    metadata: { employeeId: timesheet.employeeId._id.toString(), reason: trimmedReason }, ...reqMeta,
+  });
+
+  emitToOrg(orgId, SOCKET_EVENTS.TIMESHEET_REOPENED, { timesheetId: updated._id.toString() });
+  if (timesheet.employeeId.userId) {
+    emitToUser(timesheet.employeeId.userId, SOCKET_EVENTS.TIMESHEET_REOPENED, { timesheetId: updated._id.toString() });
+    await notifyEmployee(orgId, timesheet.employeeId.userId, 'TIMESHEET_REOPENED', 'Timesheet reopened for correction',
+      `Your approved timesheet for ${updated.periodStart} – ${updated.periodEnd} was reopened: ${trimmedReason}`, updated._id);
+  }
+
+  return toManagerDTO({ ...updated, employeeId: timesheet.employeeId });
+}
+
 function emitToOrg(organizationId, event, payload) {
   try {
     const io = getSocketInstance();
@@ -523,11 +652,13 @@ module.exports = {
   getMyTimesheetById,
   getMyTimesheetEntries,
   submitTimesheet,
+  resubmitTimesheet,
   getManagerTimesheets,
   getManagerTimesheetById,
   getManagerTimesheetEntries,
   approveTimesheet,
   rejectTimesheet,
+  reopenTimesheet,
   // exported for unit testing the pure validation logic in isolation
   buildSnapshot,
   mondayOf,

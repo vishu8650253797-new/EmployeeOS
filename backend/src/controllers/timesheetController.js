@@ -27,3 +27,8 @@ exports.rejectTimesheet = async (req, res) => {
   const data = await timesheetService.rejectTimesheet(req.organizationId, req.user, req.params.id, req.body.reason, reqMeta(req));
   res.json({ success: true, message: 'Timesheet rejected', data });
 };
+
+exports.reopenTimesheet = async (req, res) => {
+  const data = await timesheetService.reopenTimesheet(req.organizationId, req.user, req.params.id, req.body.reason, reqMeta(req));
+  res.json({ success: true, message: 'Timesheet reopened', data });
+};

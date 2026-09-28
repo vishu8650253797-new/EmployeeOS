@@ -30,4 +30,9 @@ export const timesheetService = {
     const { data } = await api.post(`/ess/timesheets/${id}/submit`);
     return data.data;
   },
+
+  async resubmit(id) {
+    const { data } = await api.post(`/ess/timesheets/${id}/resubmit`);
+    return data.data;
+  },
 };

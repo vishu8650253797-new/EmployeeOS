@@ -32,3 +32,8 @@ exports.submitTimesheet = async (req, res) => {
   const data = await timesheetService.submitTimesheet(req.organizationId, req.user, req.params.id, reqMeta(req));
   res.json({ success: true, message: 'Timesheet submitted', data });
 };
+
+exports.resubmitTimesheet = async (req, res) => {
+  const data = await timesheetService.resubmitTimesheet(req.organizationId, req.user, req.params.id, reqMeta(req));
+  res.json({ success: true, message: 'Timesheet resubmitted', data });
+};

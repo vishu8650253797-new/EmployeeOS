@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ClipboardCheck, Check, X, Eye } from 'lucide-react';
+import { ClipboardCheck, Check, X, Eye, RotateCcw } from 'lucide-react';
 import { managerTimesheetService } from '../../services/managerTimesheetService';
 import { useFetch } from '../../hooks/useFetch';
 import { useToast } from '../../context/ToastContext';
@@ -37,26 +37,39 @@ function groupByDate(entries) {
   return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, list]) => ({ date, entries: list }));
 }
 
-function RejectModal({ open, onClose, onSubmit, saving }) {
+// Shared by both "reject a submitted timesheet" and "reopen an approved
+// one" — both are, functionally, the same action (send it back with a
+// mandatory reason), just from a different starting status. See
+// timesheetService.js's reopenTimesheet for why this isn't a separate
+// backend concept either.
+function ReasonModal({ open, onClose, onSubmit, saving, title, confirmLabel, confirmVariant = 'danger', placeholder }) {
   const [reason, setReason] = useState('');
   return (
     <Modal
       open={open}
       onClose={() => { setReason(''); onClose(); }}
-      title="Reject timesheet"
+      title={title}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button variant="danger" onClick={() => onSubmit(reason)} loading={saving} disabled={!reason.trim()}>
-            Reject timesheet
+          <Button variant={confirmVariant} onClick={() => onSubmit(reason)} loading={saving} disabled={!reason.trim()}>
+            {confirmLabel}
           </Button>
         </>
       }
     >
-      <Input label="Reason" required textarea rows={3} value={reason} onChange={setReason} placeholder="Let the employee know what needs to change" />
+      <Input label="Reason" required textarea rows={3} value={reason} onChange={setReason} placeholder={placeholder} />
     </Modal>
   );
 }
+
+const HISTORY_LABELS = {
+  TIMESHEET_SUBMITTED: 'Submitted',
+  TIMESHEET_APPROVED: 'Approved',
+  TIMESHEET_REJECTED: 'Rejected',
+  TIMESHEET_RESUBMITTED: 'Resubmitted',
+  TIMESHEET_REOPENED: 'Reopened for correction',
+};
 
 function TimesheetDetailModal({ timesheetId, onClose, onDecision }) {
   const { data: timesheet, loading, refetch } = useFetch(
@@ -69,6 +82,7 @@ function TimesheetDetailModal({ timesheetId, onClose, onDecision }) {
   );
   const [approveOpen, setApproveOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [reopenOpen, setReopenOpen] = useState(false);
   const [processing, setProcessing] = useState(false);
   const { toast } = useToast();
 
@@ -100,8 +114,23 @@ function TimesheetDetailModal({ timesheetId, onClose, onDecision }) {
     }
   }
 
+  async function handleReopen(reason) {
+    setProcessing(true);
+    try {
+      await managerTimesheetService.reopen(timesheetId, reason);
+      toast.success('Timesheet reopened.');
+      setReopenOpen(false);
+      onDecision();
+    } catch (err) {
+      toast.error(err.message || 'Could not reopen timesheet.');
+    } finally {
+      setProcessing(false);
+    }
+  }
+
   const days = groupByDate(entries || []);
   const isSubmitted = timesheet?.status === 'SUBMITTED';
+  const isApproved = timesheet?.status === 'APPROVED';
 
   return (
     <Modal
@@ -119,6 +148,14 @@ function TimesheetDetailModal({ timesheetId, onClose, onDecision }) {
             <Button onClick={() => setApproveOpen(true)}>
               <Check size={14} />
               Approve
+            </Button>
+          </>
+        ) : isApproved ? (
+          <>
+            <Button variant="secondary" onClick={onClose}>Close</Button>
+            <Button variant="secondary" onClick={() => setReopenOpen(true)}>
+              <RotateCcw size={14} />
+              Reopen for correction
             </Button>
           </>
         ) : (
@@ -182,6 +219,24 @@ function TimesheetDetailModal({ timesheetId, onClose, onDecision }) {
             </div>
           )}
 
+          {timesheet.history?.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-medium text-ink-400">Review history</p>
+              <div className="space-y-2 rounded-lg border border-line bg-canvas p-3">
+                {timesheet.history.map((h, i) => (
+                  <div key={i} className="flex items-start justify-between gap-3 text-[13px]">
+                    <span className="text-ink-700">
+                      {HISTORY_LABELS[h.action] || h.action}
+                      {h.actor && ` · ${h.actor.firstName} ${h.actor.lastName}`}
+                      {h.reason && <span className="block text-ink-500">"{h.reason}"</span>}
+                    </span>
+                    <span className="shrink-0 text-ink-400">{formatDate(h.at, { hour: 'numeric', minute: '2-digit' })}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
             <p className="mb-2 text-xs font-medium text-ink-400">Daily entries</p>
             {entriesLoading ? (
@@ -226,7 +281,26 @@ function TimesheetDetailModal({ timesheetId, onClose, onDecision }) {
         message={timesheet ? `Approve ${fullName(timesheet.employee)}'s timesheet for ${formatDate(timesheet.periodStart)} – ${formatDate(timesheet.periodEnd)}?` : ''}
         confirmLabel="Approve"
       />
-      <RejectModal open={rejectOpen} onClose={() => setRejectOpen(false)} onSubmit={handleReject} saving={processing} />
+      <ReasonModal
+        open={rejectOpen}
+        onClose={() => setRejectOpen(false)}
+        onSubmit={handleReject}
+        saving={processing}
+        title="Reject timesheet"
+        confirmLabel="Reject timesheet"
+        confirmVariant="danger"
+        placeholder="Let the employee know what needs to change"
+      />
+      <ReasonModal
+        open={reopenOpen}
+        onClose={() => setReopenOpen(false)}
+        onSubmit={handleReopen}
+        saving={processing}
+        title="Reopen timesheet"
+        confirmLabel="Reopen for correction"
+        confirmVariant="secondary"
+        placeholder="Let the employee know what needs to be corrected"
+      />
     </Modal>
   );
 }
@@ -246,6 +320,8 @@ export default function ManagerTimesheets() {
 
   useSocketEvent(SOCKET_EVENTS.TIMESHEET_APPROVED, refetch, [refetch]);
   useSocketEvent(SOCKET_EVENTS.TIMESHEET_REJECTED, refetch, [refetch]);
+  useSocketEvent(SOCKET_EVENTS.TIMESHEET_RESUBMITTED, refetch, [refetch]);
+  useSocketEvent(SOCKET_EVENTS.TIMESHEET_REOPENED, refetch, [refetch]);
 
   function handleDecision() {
     setDetailId(null);

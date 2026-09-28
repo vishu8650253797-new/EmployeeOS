@@ -576,7 +576,7 @@ describe('Timesheets — rejection workflow', () => {
     expect(res.status).toBe(409);
   });
 
-  test('a rejected timesheet cannot be re-prepared (no resubmission workflow exists)', async () => {
+  test('a rejected timesheet cannot be re-prepared (correction goes through /resubmit, not /prepare)', async () => {
     const org = await createOrganization();
     const { managerUser, employeeUser } = await setupManagerAndReport(org);
     const id = await setupSubmittedTimesheetFor(org, employeeUser);
@@ -616,5 +616,302 @@ describe('Timesheets — self-approval protection', () => {
 
     const stillSubmitted = await Timesheet.findById(id).lean();
     expect(stillSubmitted.status).toBe('SUBMITTED');
+  });
+});
+
+// ---- Employee correction & resubmission (Step 13E) -------------------------
+
+describe('Timesheets — employee correction & resubmission', () => {
+  test('an employee sees the rejection reason and, after adding a valid entry, can resubmit', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser, employee } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+    await request(app).post(`/api/timesheets/${id}/reject`).set('Authorization', authHeaderFor(managerUser)).send({ reason: 'Please add more detail' });
+
+    const viewRes = await request(app).get(`/api/ess/timesheets/${id}`).set('Authorization', authHeaderFor(employeeUser));
+    expect(viewRes.body.data.status).toBe('REJECTED');
+    expect(viewRes.body.data.rejectionReason).toBe('Please add more detail');
+
+    // Correction = clock a new entry for the period, then resubmit — there is
+    // no edit-existing-entry endpoint in this codebase (Step 13B never built
+    // one), so this is the only real correction mechanism available today.
+    const start = await request(app).post('/api/ess/time-entries/start').set('Authorization', authHeaderFor(employeeUser));
+    await request(app).post(`/api/ess/time-entries/${start.body.data.id}/end`).set('Authorization', authHeaderFor(employeeUser)).send({ notes: 'correction entry' });
+
+    const resubmitRes = await request(app).post(`/api/ess/timesheets/${id}/resubmit`).set('Authorization', authHeaderFor(employeeUser));
+    expect(resubmitRes.status).toBe(200);
+    expect(resubmitRes.body.data.status).toBe('SUBMITTED');
+    expect(resubmitRes.body.data.entryCount).toBe(2);
+    // The prior decision is cleared — it's no longer the current state —
+    // but remains visible via history (tested separately below).
+    expect(resubmitRes.body.data.rejectionReason).toBeFalsy();
+  });
+
+  test('a rejected timesheet still failing validation (e.g. an open entry) cannot be resubmitted', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser, employee } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+    await request(app).post(`/api/timesheets/${id}/reject`).set('Authorization', authHeaderFor(managerUser)).send({ reason: 'x' });
+
+    // Leave a new entry open (no clock-out) — still not ready.
+    await request(app).post('/api/ess/time-entries/start').set('Authorization', authHeaderFor(employeeUser));
+
+    const res = await request(app).post(`/api/ess/timesheets/${id}/resubmit`).set('Authorization', authHeaderFor(employeeUser));
+    expect(res.status).toBe(422);
+
+    const stillRejected = await Timesheet.findById(id).lean();
+    expect(stillRejected.status).toBe('REJECTED');
+  });
+
+  test('an employee cannot resubmit another employee\'s timesheet (IDOR)', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const { user: otherUser } = await createUserWithEmployee(org._id, { joiningDate: new Date('2025-01-01') });
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+    await request(app).post(`/api/timesheets/${id}/reject`).set('Authorization', authHeaderFor(managerUser)).send({ reason: 'x' });
+
+    const res = await request(app).post(`/api/ess/timesheets/${id}/resubmit`).set('Authorization', authHeaderFor(otherUser));
+    expect(res.status).toBe(404);
+
+    const stillRejected = await Timesheet.findById(id).lean();
+    expect(stillRejected.status).toBe('REJECTED');
+  });
+
+  test('only a REJECTED timesheet is eligible for resubmission — not DRAFT, SUBMITTED, or APPROVED', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+
+    // still SUBMITTED (never rejected)
+    const res = await request(app).post(`/api/ess/timesheets/${id}/resubmit`).set('Authorization', authHeaderFor(employeeUser));
+    expect(res.status).toBe(409);
+
+    await request(app).post(`/api/timesheets/${id}/approve`).set('Authorization', authHeaderFor(managerUser));
+    const res2 = await request(app).post(`/api/ess/timesheets/${id}/resubmit`).set('Authorization', authHeaderFor(employeeUser));
+    expect(res2.status).toBe(409);
+  });
+
+  test('duplicate/concurrent resubmission is prevented — exactly one succeeds', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+    await request(app).post(`/api/timesheets/${id}/reject`).set('Authorization', authHeaderFor(managerUser)).send({ reason: 'x' });
+    const start = await request(app).post('/api/ess/time-entries/start').set('Authorization', authHeaderFor(employeeUser));
+    await request(app).post(`/api/ess/time-entries/${start.body.data.id}/end`).set('Authorization', authHeaderFor(employeeUser)).send({ notes: 'x' });
+
+    const [a, b] = await Promise.all([
+      request(app).post(`/api/ess/timesheets/${id}/resubmit`).set('Authorization', authHeaderFor(employeeUser)),
+      request(app).post(`/api/ess/timesheets/${id}/resubmit`).set('Authorization', authHeaderFor(employeeUser)),
+    ]);
+    // exactly one request wins the atomic status:'REJECTED' guard
+    const successes = [a, b].filter((r) => r.status === 200);
+    expect(successes).toHaveLength(1);
+
+    const final = await Timesheet.findById(id).lean();
+    expect(final.status).toBe('SUBMITTED');
+  });
+
+  test('the manager is notified when the employee resubmits, and sees it back in their queue', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+    await request(app).post(`/api/timesheets/${id}/reject`).set('Authorization', authHeaderFor(managerUser)).send({ reason: 'x' });
+    const start = await request(app).post('/api/ess/time-entries/start').set('Authorization', authHeaderFor(employeeUser));
+    await request(app).post(`/api/ess/time-entries/${start.body.data.id}/end`).set('Authorization', authHeaderFor(employeeUser)).send({ notes: 'x' });
+
+    await request(app).post(`/api/ess/timesheets/${id}/resubmit`).set('Authorization', authHeaderFor(employeeUser));
+
+    const notifications = await Notification.find({ recipientId: managerUser._id, type: 'TIMESHEET_RESUBMITTED' });
+    expect(notifications).toHaveLength(1);
+
+    const queue = await request(app).get('/api/timesheets?status=SUBMITTED').set('Authorization', authHeaderFor(managerUser));
+    expect(queue.body.data.map((t) => t.id)).toContain(id);
+  });
+});
+
+// ---- Manager reopen of an approved timesheet (Step 13E) --------------------
+
+describe('Timesheets — manager reopen', () => {
+  async function approveTimesheetFor(org, managerUser, employeeUser) {
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+    await request(app).post(`/api/timesheets/${id}/approve`).set('Authorization', authHeaderFor(managerUser));
+    return id;
+  }
+
+  test('an authorized manager can reopen an approved timesheet with a reason', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await approveTimesheetFor(org, managerUser, employeeUser);
+
+    const res = await request(app).post(`/api/timesheets/${id}/reopen`).set('Authorization', authHeaderFor(managerUser)).send({ reason: 'Found a discrepancy' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('REJECTED');
+    expect(res.body.data.rejectionReason).toBe('Found a discrepancy');
+  });
+
+  test('reopening without a reason is rejected', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await approveTimesheetFor(org, managerUser, employeeUser);
+
+    const res = await request(app).post(`/api/timesheets/${id}/reopen`).set('Authorization', authHeaderFor(managerUser)).send({});
+    expect(res.status).toBe(400);
+  });
+
+  test('an unrelated manager cannot reopen a timesheet outside their scope', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await approveTimesheetFor(org, managerUser, employeeUser);
+    const { user: unrelatedManager } = await createUserWithEmployee(org._id, { role: 'MANAGER', firstName: 'Unrelated' });
+
+    const res = await request(app).post(`/api/timesheets/${id}/reopen`).set('Authorization', authHeaderFor(unrelatedManager)).send({ reason: 'x' });
+    expect(res.status).toBe(403);
+
+    const stillApproved = await Timesheet.findById(id).lean();
+    expect(stillApproved.status).toBe('APPROVED');
+  });
+
+  test('a manager cannot reopen another organization\'s timesheet', async () => {
+    const orgA = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(orgA);
+    const id = await approveTimesheetFor(orgA, managerUser, employeeUser);
+
+    const orgB = await createOrganization();
+    const { managerUser: managerB } = await setupManagerAndReport(orgB);
+
+    // Cross-org lookup fails at "not found" before authorization is even
+    // checked — the same pattern used everywhere else in this codebase
+    // (never confirm a cross-org record's existence via a 403).
+    const res = await request(app).post(`/api/timesheets/${id}/reopen`).set('Authorization', authHeaderFor(managerB)).send({ reason: 'x' });
+    expect(res.status).toBe(404);
+  });
+
+  test('only an approved timesheet can be reopened — not a still-submitted one', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+
+    const res = await request(app).post(`/api/timesheets/${id}/reopen`).set('Authorization', authHeaderFor(managerUser)).send({ reason: 'x' });
+    expect(res.status).toBe(409);
+  });
+
+  test('an HR admin cannot reopen their own approved timesheet (self-reopen protection)', async () => {
+    const org = await createOrganization();
+    const { user: hrAdminUser } = await createUserWithEmployee(org._id, { role: 'HR_ADMIN', joiningDate: new Date('2025-01-01') });
+    const id = await setupSubmittedTimesheetFor(org, hrAdminUser);
+    await request(app).post(`/api/timesheets/${id}/approve`).set('Authorization', authHeaderFor(hrAdminUser));
+
+    const res = await request(app).post(`/api/timesheets/${id}/reopen`).set('Authorization', authHeaderFor(hrAdminUser)).send({ reason: 'x' });
+    expect(res.status).toBe(403);
+  });
+
+  test('concurrent reopen requests are handled safely — exactly one succeeds', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await approveTimesheetFor(org, managerUser, employeeUser);
+
+    const [a, b] = await Promise.all([
+      request(app).post(`/api/timesheets/${id}/reopen`).set('Authorization', authHeaderFor(managerUser)).send({ reason: 'first' }),
+      request(app).post(`/api/timesheets/${id}/reopen`).set('Authorization', authHeaderFor(managerUser)).send({ reason: 'second' }),
+    ]);
+    const successes = [a, b].filter((r) => r.status === 200);
+    expect(successes).toHaveLength(1);
+  });
+
+  test('an audit log is created and the employee is notified on reopen', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await approveTimesheetFor(org, managerUser, employeeUser);
+    await request(app).post(`/api/timesheets/${id}/reopen`).set('Authorization', authHeaderFor(managerUser)).send({ reason: 'Please recheck Tuesday' });
+
+    const logs = await AuditLog.find({ action: 'TIMESHEET_REOPENED', entityId: id });
+    expect(logs).toHaveLength(1);
+    expect(logs[0].metadata.reason).toBe('Please recheck Tuesday');
+
+    const notifications = await Notification.find({ recipientId: employeeUser._id, type: 'TIMESHEET_REOPENED' });
+    expect(notifications).toHaveLength(1);
+  });
+
+  test('full round trip: submit -> approve -> reopen -> correct -> resubmit -> re-approve', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await approveTimesheetFor(org, managerUser, employeeUser);
+
+    await request(app).post(`/api/timesheets/${id}/reopen`).set('Authorization', authHeaderFor(managerUser)).send({ reason: 'One more check' });
+    let current = await Timesheet.findById(id).lean();
+    expect(current.status).toBe('REJECTED');
+
+    const start = await request(app).post('/api/ess/time-entries/start').set('Authorization', authHeaderFor(employeeUser));
+    await request(app).post(`/api/ess/time-entries/${start.body.data.id}/end`).set('Authorization', authHeaderFor(employeeUser)).send({ notes: 'x' });
+    const resubmitRes = await request(app).post(`/api/ess/timesheets/${id}/resubmit`).set('Authorization', authHeaderFor(employeeUser));
+    expect(resubmitRes.body.data.status).toBe('SUBMITTED');
+
+    const reapproveRes = await request(app).post(`/api/timesheets/${id}/approve`).set('Authorization', authHeaderFor(managerUser));
+    expect(reapproveRes.status).toBe(200);
+    expect(reapproveRes.body.data.status).toBe('APPROVED');
+  });
+});
+
+// ---- Finalization / locking (Step 13E — reuses APPROVED as the locked state)
+
+describe('Timesheets — finalization / locking (APPROVED is the locked state)', () => {
+  test('an approved timesheet cannot be modified via prepare or resubmit — direct API bypass is blocked', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+    await request(app).post(`/api/timesheets/${id}/approve`).set('Authorization', authHeaderFor(managerUser));
+
+    const prepareRes = await request(app).post('/api/ess/timesheets/prepare').set('Authorization', authHeaderFor(employeeUser));
+    expect(prepareRes.status).toBe(409);
+
+    const resubmitRes = await request(app).post(`/api/ess/timesheets/${id}/resubmit`).set('Authorization', authHeaderFor(employeeUser));
+    expect(resubmitRes.status).toBe(409);
+
+    const stillApproved = await Timesheet.findById(id).lean();
+    expect(stillApproved.status).toBe('APPROVED');
+  });
+
+  test('only an authorized manager can unlock (reopen) an approved timesheet — no unrestricted override exists', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+    await request(app).post(`/api/timesheets/${id}/approve`).set('Authorization', authHeaderFor(managerUser));
+
+    // The employee themself has no reopen capability at all.
+    const employeeAttempt = await request(app).post(`/api/timesheets/${id}/reopen`).set('Authorization', authHeaderFor(employeeUser)).send({ reason: 'x' });
+    expect(employeeAttempt.status).toBe(403);
+  });
+});
+
+// ---- Review history (Step 13E — reuses AuditLog, no duplicate history store)
+
+describe('Timesheets — review history', () => {
+  test('the full lifecycle is visible in history with the correct action names', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+    await request(app).post(`/api/timesheets/${id}/reject`).set('Authorization', authHeaderFor(managerUser)).send({ reason: 'first pass' });
+
+    const start = await request(app).post('/api/ess/time-entries/start').set('Authorization', authHeaderFor(employeeUser));
+    await request(app).post(`/api/ess/time-entries/${start.body.data.id}/end`).set('Authorization', authHeaderFor(employeeUser)).send({ notes: 'x' });
+    await request(app).post(`/api/ess/timesheets/${id}/resubmit`).set('Authorization', authHeaderFor(employeeUser));
+    await request(app).post(`/api/timesheets/${id}/approve`).set('Authorization', authHeaderFor(managerUser));
+
+    const employeeView = await request(app).get(`/api/ess/timesheets/${id}`).set('Authorization', authHeaderFor(employeeUser));
+    const actions = employeeView.body.data.history.map((h) => h.action);
+    expect(actions).toEqual(['TIMESHEET_SUBMITTED', 'TIMESHEET_REJECTED', 'TIMESHEET_RESUBMITTED', 'TIMESHEET_APPROVED']);
+  });
+
+  test('a reopen is distinguishable in history from an ordinary rejection', async () => {
+    const org = await createOrganization();
+    const { managerUser, employeeUser } = await setupManagerAndReport(org);
+    const id = await setupSubmittedTimesheetFor(org, employeeUser);
+    await request(app).post(`/api/timesheets/${id}/approve`).set('Authorization', authHeaderFor(managerUser));
+    await request(app).post(`/api/timesheets/${id}/reopen`).set('Authorization', authHeaderFor(managerUser)).send({ reason: 'x' });
+
+    const managerView = await request(app).get(`/api/timesheets/${id}`).set('Authorization', authHeaderFor(managerUser));
+    const actions = managerView.body.data.history.map((h) => h.action);
+    expect(actions).toContain('TIMESHEET_REOPENED');
+    expect(actions).not.toContain('TIMESHEET_REJECTED');
   });
 });

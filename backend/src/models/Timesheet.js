@@ -4,16 +4,38 @@ const { Schema, model } = require('mongoose');
 // on top of the Step 13A TimeEntry foundation without modifying it. A
 // Timesheet is a server-computed weekly (Monday-Sunday) rollup of an
 // employee's own TimeEntry records: while DRAFT, entries are resolved live
-// by date-range query (see timesheetService.refreshIfDraft); at SUBMIT, the
+// by date-range query (see timesheetService.refreshIfEditable); at SUBMIT, the
 // included entries are frozen into `timeEntryIds` and the totals/validation
 // snapshot becomes final, mirroring how PayrollRecord freezes its line
 // items at finalize. reviewedBy/reviewedAt/rejectionReason mirror
 // LeaveRequest's field names for the same concept.
 
+// Step 13E note: this codebase's convention throughout Steps 13A-13D has
+// been to reuse an existing status/mechanism rather than add a parallel one
+// wherever the existing one already does the job (see LOCKED_STATUSES/
+// PayrollRecord-freeze-at-finalize comments below). Two decisions made on
+// that same basis for 13E, deliberately NOT reflected as new enum values:
+//   - "Finalized/locked" is APPROVED itself — no employee-side path can ever
+//     modify an APPROVED timesheet (see prepareTimesheet's LOCKED_STATUSES
+//     guard, unchanged), so a separate FINALIZED status would duplicate a
+//     state that already behaves identically. The only controlled way past
+//     it is the new manager reopenTimesheet() action.
+//   - "Corrected" is not a distinct status — REJECTED already means
+//     "the employee may act on this," and resubmitTimesheet() transitions
+//     REJECTED -> SUBMITTED directly once entries are ready, exactly the
+//     conceptual CORRECTED step with no separate status needed for it.
+//   - "Reopened" reuses the same REJECTED target + reviewedBy/reviewedAt/
+//     rejectionReason fields as an ordinary rejection (reopening an APPROVED
+//     timesheet is, functionally, a manager sending it back with a reason —
+//     the same shape). What makes a reopen distinguishable from a first-pass
+//     rejection is the audit action name (TIMESHEET_REOPENED vs
+//     TIMESHEET_REJECTED), surfaced via getTimesheetHistory() in
+//     timesheetService.js, which reads the existing AuditLog rather than a
+//     second, duplicate history mechanism.
 const TIMESHEET_STATUSES = ['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED'];
-// Once left DRAFT, a timesheet is never editable/re-preparable again — there
-// is no "returned for correction" workflow in this codebase today (leave
-// doesn't have one either), so a rejection is terminal like leave's.
+// Once left DRAFT, a timesheet is never re-preparable (prepare() is
+// specifically the DRAFT-creation/refresh path) — but REJECTED is not
+// otherwise terminal: resubmitTimesheet() can move it back to SUBMITTED.
 const LOCKED_STATUSES = ['SUBMITTED', 'APPROVED', 'REJECTED'];
 
 const validationIssueSchema = new Schema(

@@ -25,4 +25,9 @@ export const managerTimesheetService = {
     const { data } = await api.post(`/timesheets/${id}/reject`, { reason });
     return data.data;
   },
+
+  async reopen(id, reason) {
+    const { data } = await api.post(`/timesheets/${id}/reopen`, { reason });
+    return data.data;
+  },
 };

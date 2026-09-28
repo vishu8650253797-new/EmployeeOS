@@ -142,6 +142,8 @@ const SOCKET_EVENTS = {
   HR_REQUEST_CANCELLED: 'hrRequest:cancelled',
   TIMESHEET_APPROVED: 'timesheet:approved',
   TIMESHEET_REJECTED: 'timesheet:rejected',
+  TIMESHEET_RESUBMITTED: 'timesheet:resubmitted',
+  TIMESHEET_REOPENED: 'timesheet:reopened',
 };
 
 module.exports = SOCKET_EVENTS;
