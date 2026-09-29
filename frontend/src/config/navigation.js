@@ -32,6 +32,7 @@ import {
   LogOut,
   UserRound,
   Clock,
+  CalendarClock,
 } from 'lucide-react';
 
 // Sidebar navigation. Later, filter sections/items by role permissions.
@@ -52,6 +53,7 @@ export const NAV_SECTIONS = [
       { label: 'Attendance', to: '/attendance', icon: CalendarCheck },
       { label: 'Timesheets', to: '/timesheets', icon: ClipboardCheck },
       { label: 'Shifts', to: '/shifts', icon: Clock },
+      { label: 'Employee Scheduling', to: '/employee-schedules', icon: CalendarClock },
       { label: 'Leave', to: '/leave', icon: CalendarOff },
       { label: 'My Leave', to: '/my-leave', icon: CalendarPlus },
       { label: 'Leave Types', to: '/leave-types', icon: Layers },

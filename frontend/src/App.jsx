@@ -28,6 +28,7 @@ const NotificationsPage = lazy(() => import('./pages/notifications/Notifications
 const EssTimesheet = lazy(() => import('./pages/ess/EssTimesheet'));
 const ManagerTimesheets = lazy(() => import('./pages/timesheets/ManagerTimesheets'));
 const ShiftManagement = lazy(() => import('./pages/scheduling/ShiftManagement'));
+const EmployeeScheduling = lazy(() => import('./pages/scheduling/EmployeeScheduling'));
 const EmployeeList = lazy(() => import('./pages/employees/EmployeeList'));
 const EmployeeForm = lazy(() => import('./pages/employees/EmployeeForm'));
 const EmployeeProfile = lazy(() => import('./pages/employees/EmployeeProfile'));
@@ -165,6 +166,7 @@ export default function App() {
                   <Route path="/attendance" element={<Attendance />} />
                   <Route path="/timesheets" element={<ManagerTimesheets />} />
                   <Route path="/shifts" element={<ShiftManagement />} />
+                  <Route path="/employee-schedules" element={<EmployeeScheduling />} />
                   <Route path="/my-attendance" element={<MyAttendance />} />
                   <Route path="/leave" element={<Leave />} />
                   <Route path="/my-leave" element={<MyLeave />} />

@@ -22,3 +22,18 @@ exports.cancel = async (req, res) => {
   const data = await employeeScheduleService.cancel(req.organizationId, req.params.id, req.user, reqMeta(req));
   res.json({ success: true, message: 'Schedule assignment cancelled', data });
 };
+
+exports.updateSchedule = async (req, res) => {
+  const data = await employeeScheduleService.updateSchedule(req.organizationId, req.params.id, req.body, req.user, reqMeta(req));
+  res.json({ success: true, message: 'Schedule assignment updated', data });
+};
+
+exports.validateAssignment = async (req, res) => {
+  const data = await employeeScheduleService.validateAssignment(req.organizationId, req.body, req.user);
+  res.json({ success: true, data });
+};
+
+exports.bulkAssign = async (req, res) => {
+  const data = await employeeScheduleService.bulkAssign(req.organizationId, req.body, req.user, reqMeta(req));
+  res.json({ success: true, data });
+};

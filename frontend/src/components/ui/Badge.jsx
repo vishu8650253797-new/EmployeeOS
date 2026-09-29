@@ -25,6 +25,7 @@ export const STATUS_TONES = {
   SUSPENDED: 'warning',
   HALF_DAY: 'warning',
   CANCELLED: 'neutral',
+  SUPERSEDED: 'info',
   INACTIVE: 'neutral',
   Inactive: 'neutral',
   ABSENT: 'danger',

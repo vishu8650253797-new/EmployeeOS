@@ -275,3 +275,306 @@ describe('ESS self-service — GET /api/ess/schedule', () => {
     expect(res.status).toBe(404);
   });
 });
+
+function daysFromNow(n) {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+describe('Employee schedule — update (PATCH /:id)', () => {
+  test('a future assignment (not yet started) can be updated', async () => {
+    const org = await createOrganization();
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+    const { employee } = await setupManagerAndReport(org);
+    const shift = await createShift(hrAdmin);
+    const created = await request(app)
+      .post('/api/employee-schedules')
+      .set('Authorization', authHeaderFor(hrAdmin))
+      .send({ employeeId: employee._id.toString(), shiftId: shift.id, effectiveFrom: daysFromNow(10) });
+
+    const res = await request(app)
+      .patch(`/api/employee-schedules/${created.body.data.id}`)
+      .set('Authorization', authHeaderFor(hrAdmin))
+      .send({ effectiveFrom: daysFromNow(14), reason: 'pushed back a few days' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.reason).toBe('pushed back a few days');
+  });
+
+  test('an assignment that has already started cannot be updated', async () => {
+    const org = await createOrganization();
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+    const { employee } = await setupManagerAndReport(org);
+    const shift = await createShift(hrAdmin);
+    const created = await request(app)
+      .post('/api/employee-schedules')
+      .set('Authorization', authHeaderFor(hrAdmin))
+      .send({ employeeId: employee._id.toString(), shiftId: shift.id, effectiveFrom: daysFromNow(-5) });
+
+    const res = await request(app)
+      .patch(`/api/employee-schedules/${created.body.data.id}`)
+      .set('Authorization', authHeaderFor(hrAdmin))
+      .send({ reason: 'trying to edit history' });
+
+    expect(res.status).toBe(409);
+  });
+
+  test('a cancelled assignment cannot be updated', async () => {
+    const org = await createOrganization();
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+    const { employee } = await setupManagerAndReport(org);
+    const shift = await createShift(hrAdmin);
+    const created = await request(app)
+      .post('/api/employee-schedules')
+      .set('Authorization', authHeaderFor(hrAdmin))
+      .send({ employeeId: employee._id.toString(), shiftId: shift.id, effectiveFrom: daysFromNow(10) });
+    await request(app).post(`/api/employee-schedules/${created.body.data.id}/cancel`).set('Authorization', authHeaderFor(hrAdmin));
+
+    const res = await request(app)
+      .patch(`/api/employee-schedules/${created.body.data.id}`)
+      .set('Authorization', authHeaderFor(hrAdmin))
+      .send({ reason: 'edit after cancel' });
+
+    expect(res.status).toBe(409);
+  });
+
+  test('a manager cannot update an assignment outside their scope', async () => {
+    const org = await createOrganization();
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+    const { employee } = await setupManagerAndReport(org);
+    const { managerUser: otherManager } = await setupManagerAndReport(org);
+    const shift = await createShift(hrAdmin);
+    const created = await request(app)
+      .post('/api/employee-schedules')
+      .set('Authorization', authHeaderFor(hrAdmin))
+      .send({ employeeId: employee._id.toString(), shiftId: shift.id, effectiveFrom: daysFromNow(10) });
+
+    const res = await request(app)
+      .patch(`/api/employee-schedules/${created.body.data.id}`)
+      .set('Authorization', authHeaderFor(otherManager))
+      .send({ reason: 'not my report' });
+
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('Employee schedule — validate (POST /validate)', () => {
+  test('a clean assignment returns no warnings', async () => {
+    const org = await createOrganization();
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+    const { employee } = await setupManagerAndReport(org);
+    const shift = await createShift(hrAdmin);
+
+    const res = await request(app)
+      .post('/api/employee-schedules/validate')
+      .set('Authorization', authHeaderFor(hrAdmin))
+      .send({ employeeId: employee._id.toString(), shiftId: shift.id, effectiveFrom: daysFromNow(1) });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.valid).toBe(true);
+    expect(res.body.data.warnings).toHaveLength(0);
+  });
+
+  test('warns when the employee already has an active assignment that would be superseded', async () => {
+    const org = await createOrganization();
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+    const { employee } = await setupManagerAndReport(org);
+    const shift = await createShift(hrAdmin);
+    await request(app)
+      .post('/api/employee-schedules')
+      .set('Authorization', authHeaderFor(hrAdmin))
+      .send({ employeeId: employee._id.toString(), shiftId: shift.id, effectiveFrom: daysFromNow(-1) });
+
+    const res = await request(app)
+      .post('/api/employee-schedules/validate')
+      .set('Authorization', authHeaderFor(hrAdmin))
+      .send({ employeeId: employee._id.toString(), shiftId: shift.id, effectiveFrom: daysFromNow(1) });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.warnings.some((w) => w.type === 'SUPERSEDE')).toBe(true);
+  });
+
+  test('warns about an overlapping approved leave request', async () => {
+    const org = await createOrganization();
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+    const { employee } = await setupManagerAndReport(org);
+    const shift = await createShift(hrAdmin);
+
+    const { LeaveType, LeaveRequest } = require('../src/models');
+    const leaveType = await LeaveType.create({ organizationId: org._id, name: 'Annual', code: 'ANN', totalDays: 20 });
+    await LeaveRequest.create({
+      organizationId: org._id, employeeId: employee._id, leaveTypeId: leaveType._id,
+      startDate: new Date(daysFromNow(2)), endDate: new Date(daysFromNow(5)), numberOfDays: 4, status: 'APPROVED',
+    });
+
+    const res = await request(app)
+      .post('/api/employee-schedules/validate')
+      .set('Authorization', authHeaderFor(hrAdmin))
+      .send({ employeeId: employee._id.toString(), shiftId: shift.id, effectiveFrom: daysFromNow(1), effectiveTo: daysFromNow(10) });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.warnings.some((w) => w.type === 'LEAVE_OVERLAP')).toBe(true);
+  });
+
+  test('validate still enforces manager scope and org isolation with normal error responses', async () => {
+    const org = await createOrganization();
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+    const { employee } = await setupManagerAndReport(org);
+    const { managerUser: otherManager } = await setupManagerAndReport(org);
+    const shift = await createShift(hrAdmin);
+
+    const res = await request(app)
+      .post('/api/employee-schedules/validate')
+      .set('Authorization', authHeaderFor(otherManager))
+      .send({ employeeId: employee._id.toString(), shiftId: shift.id, effectiveFrom: daysFromNow(1) });
+
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('Employee schedule — bulk assignment (POST /bulk)', () => {
+  test('bulk-assigns a shift to multiple explicit employees', async () => {
+    const org = await createOrganization();
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+    const { employee: emp1 } = await createUserWithEmployee(org._id, { role: 'EMPLOYEE' });
+    const { employee: emp2 } = await createUserWithEmployee(org._id, { role: 'EMPLOYEE' });
+    const shift = await createShift(hrAdmin);
+
+    const res = await request(app)
+      .post('/api/employee-schedules/bulk')
+      .set('Authorization', authHeaderFor(hrAdmin))
+      .send({ shiftId: shift.id, effectiveFrom: daysFromNow(1), employeeIds: [emp1._id.toString(), emp2._id.toString()] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.successCount).toBe(2);
+    expect(res.body.data.failureCount).toBe(0);
+  });
+
+  test('bulk-assigns to an entire department', async () => {
+    const org = await createOrganization();
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+    const deptRes = await request(app).post('/api/departments').set('Authorization', authHeaderFor(hrAdmin)).send({ name: 'Engineering' });
+    const departmentId = deptRes.body.data.id;
+    const { Employee } = require('../src/models');
+    const { employee: emp1 } = await createUserWithEmployee(org._id, { role: 'EMPLOYEE' });
+    const { employee: emp2 } = await createUserWithEmployee(org._id, { role: 'EMPLOYEE' });
+    await Employee.updateMany({ _id: { $in: [emp1._id, emp2._id] } }, { departmentId });
+    const shift = await createShift(hrAdmin);
+
+    const res = await request(app)
+      .post('/api/employee-schedules/bulk')
+      .set('Authorization', authHeaderFor(hrAdmin))
+      .send({ shiftId: shift.id, effectiveFrom: daysFromNow(1), departmentId });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.successCount).toBe(2);
+  });
+
+  test('a manager\'s bulk request reports failures for employees outside their scope without aborting the rest', async () => {
+    const org = await createOrganization();
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+    const { managerUser, employee: report } = await setupManagerAndReport(org);
+    const { employee: unrelated } = await createUserWithEmployee(org._id, { role: 'EMPLOYEE' });
+    const shift = await createShift(hrAdmin);
+
+    const res = await request(app)
+      .post('/api/employee-schedules/bulk')
+      .set('Authorization', authHeaderFor(managerUser))
+      .send({ shiftId: shift.id, effectiveFrom: daysFromNow(1), employeeIds: [report._id.toString(), unrelated._id.toString()] });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.successCount).toBe(1);
+    expect(res.body.data.failureCount).toBe(1);
+    expect(res.body.data.results.find((r) => r.employeeId === unrelated._id.toString()).success).toBe(false);
+  });
+
+  test('requires employeeIds and/or departmentId', async () => {
+    const org = await createOrganization();
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+    const shift = await createShift(hrAdmin);
+
+    const res = await request(app)
+      .post('/api/employee-schedules/bulk')
+      .set('Authorization', authHeaderFor(hrAdmin))
+      .send({ shiftId: shift.id, effectiveFrom: daysFromNow(1) });
+
+    expect(res.status).toBe(400);
+  });
+
+  test('a plain employee cannot perform a bulk assignment', async () => {
+    const org = await createOrganization();
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+    const { employee } = await createUserWithEmployee(org._id, { role: 'EMPLOYEE' });
+    const plainUser = await createUser(org._id, { role: 'EMPLOYEE' });
+    const shift = await createShift(hrAdmin);
+
+    const res = await request(app)
+      .post('/api/employee-schedules/bulk')
+      .set('Authorization', authHeaderFor(plainUser))
+      .send({ shiftId: shift.id, effectiveFrom: daysFromNow(1), employeeIds: [employee._id.toString()] });
+
+    expect(res.status).toBe(403);
+  });
+
+  test('bulk assignment records a single audit entry with a summary', async () => {
+    const org = await createOrganization();
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+    const { employee: emp1 } = await createUserWithEmployee(org._id, { role: 'EMPLOYEE' });
+    const shift = await createShift(hrAdmin);
+
+    await request(app)
+      .post('/api/employee-schedules/bulk')
+      .set('Authorization', authHeaderFor(hrAdmin))
+      .send({ shiftId: shift.id, effectiveFrom: daysFromNow(1), employeeIds: [emp1._id.toString()] });
+
+    const { AuditLog } = require('../src/models');
+    const entry = await AuditLog.findOne({ organizationId: org._id, action: 'EMPLOYEE_SCHEDULE_BULK_ASSIGNED' }).lean();
+    expect(entry).toBeTruthy();
+    expect(entry.metadata.successCount).toBe(1);
+  });
+});
+
+describe('Employee schedule list — search, department, and shift filters', () => {
+  test('search matches by employee name', async () => {
+    const org = await createOrganization();
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+    const { employee } = await createUserWithEmployee(org._id, { role: 'EMPLOYEE', firstName: 'Zendaya' });
+    const shift = await createShift(hrAdmin);
+    await request(app).post('/api/employee-schedules').set('Authorization', authHeaderFor(hrAdmin))
+      .send({ employeeId: employee._id.toString(), shiftId: shift.id, effectiveFrom: daysFromNow(1) });
+
+    const res = await request(app)
+      .get('/api/employee-schedules')
+      .query({ search: 'zendaya' })
+      .set('Authorization', authHeaderFor(hrAdmin));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+  });
+
+  test('filters by departmentId', async () => {
+    const org = await createOrganization();
+    const hrAdmin = await createUser(org._id, { role: 'HR_ADMIN' });
+    const deptRes = await request(app).post('/api/departments').set('Authorization', authHeaderFor(hrAdmin)).send({ name: 'Sales' });
+    const departmentId = deptRes.body.data.id;
+    const { Employee } = require('../src/models');
+    const { employee: inDept } = await createUserWithEmployee(org._id, { role: 'EMPLOYEE' });
+    const { employee: outOfDept } = await createUserWithEmployee(org._id, { role: 'EMPLOYEE' });
+    await Employee.updateOne({ _id: inDept._id }, { departmentId });
+    const shift = await createShift(hrAdmin);
+    await request(app).post('/api/employee-schedules').set('Authorization', authHeaderFor(hrAdmin))
+      .send({ employeeId: inDept._id.toString(), shiftId: shift.id, effectiveFrom: daysFromNow(1) });
+    await request(app).post('/api/employee-schedules').set('Authorization', authHeaderFor(hrAdmin))
+      .send({ employeeId: outOfDept._id.toString(), shiftId: shift.id, effectiveFrom: daysFromNow(1) });
+
+    const res = await request(app)
+      .get('/api/employee-schedules')
+      .query({ departmentId })
+      .set('Authorization', authHeaderFor(hrAdmin));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0].employeeId._id).toBe(inDept._id.toString());
+  });
+});
