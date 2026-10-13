@@ -7,6 +7,8 @@ import AppLayout from './components/layout/AppLayout';
 import AuthLayout from './components/layout/AuthLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { LoadingState } from './components/ui/States';
+import PwaUpdatePrompt from './components/pwa/PwaUpdatePrompt';
+import InstallPrompt from './components/pwa/InstallPrompt';
 
 // Auth pages
 const Login = lazy(() => import('./pages/auth/Login'));
@@ -265,6 +267,8 @@ export default function App() {
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
+          <PwaUpdatePrompt />
+          <InstallPrompt />
           </SocketProvider>
         </AuthProvider>
       </ToastProvider>
