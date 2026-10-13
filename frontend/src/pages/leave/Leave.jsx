@@ -314,7 +314,7 @@ export default function Leave() {
               </div>
               <StatusBadge status={detailTarget.status} className="ml-auto" />
             </div>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg border border-line bg-canvas p-4 text-[13px]">
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 rounded-lg border border-line bg-canvas p-4 text-[13px]">
               <div>
                 <dt className="text-xs text-ink-400">Leave type</dt>
                 <dd className="mt-0.5 font-medium text-ink-900">{detailTarget.leaveType}</dd>

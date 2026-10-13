@@ -163,7 +163,7 @@ export default function PayrollPeriods() {
           </>
         }
       >
-        <form id="period-form" onSubmit={handleCreate} className="grid grid-cols-2 gap-3">
+        <form id="period-form" onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Input label="Year" type="number" required value={form.year} onChange={(v) => updateField('year', v)} />
           <div>
             <label className="mb-1.5 block text-[13px] font-medium text-ink-700">Month</label>

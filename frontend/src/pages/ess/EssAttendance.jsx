@@ -151,7 +151,7 @@ export default function EssAttendance() {
         footer={<Button variant="secondary" onClick={() => setDetailTarget(null)}>Close</Button>}
       >
         {detailTarget && (
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 text-[13px]">
             <div>
               <dt className="text-xs text-ink-400">Date</dt>
               <dd className="mt-0.5 font-medium text-ink-900">{formatDate(detailTarget.date)}</dd>

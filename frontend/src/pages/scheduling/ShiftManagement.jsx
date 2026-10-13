@@ -265,11 +265,11 @@ export default function ShiftManagement() {
         }
       >
         <form id="shift-form" onSubmit={handleSave} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Name" required value={form.name} onChange={(v) => updateField('name', v)} error={errors.name} placeholder="Morning Shift" />
             <Input label="Code" required value={form.code} onChange={(v) => updateField('code', v)} error={errors.code} uppercase placeholder="MORN" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Start time" required type="time" value={form.startTime} onChange={(v) => updateField('startTime', v)} error={errors.startTime} />
             <Input label="End time" required type="time" value={form.endTime} onChange={(v) => updateField('endTime', v)} error={errors.endTime} hint={form.endTime && form.startTime && form.endTime <= form.startTime ? 'Overnight shift (crosses midnight)' : undefined} />
           </div>

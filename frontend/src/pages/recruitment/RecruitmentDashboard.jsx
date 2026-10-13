@@ -82,7 +82,7 @@ export default function RecruitmentDashboard() {
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="rounded-xl border border-line bg-surface p-5">
           <h3 className="text-sm font-semibold text-ink-900">Quick Actions</h3>
-          <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Button variant="secondary" onClick={() => navigate('/recruitment/jobs')} className="w-full">
               Manage Jobs
             </Button>

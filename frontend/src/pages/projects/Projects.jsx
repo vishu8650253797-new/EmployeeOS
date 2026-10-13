@@ -245,20 +245,20 @@ export default function Projects() {
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Project' : 'New Project'} size="lg">
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="Project Name" value={form.name} onChange={(v) => updateField('name', v)} error={errors.name} required />
             <Input label="Project Key" value={form.key} onChange={(v) => updateField('key', v)} error={errors.key} required uppercase />
           </div>
           <Input label="Description" value={form.description} onChange={(v) => updateField('description', v)} textarea rows={3} />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select label="Owner" value={form.ownerId} onChange={(v) => updateField('ownerId', v)} options={ownerOptions} error={errors.ownerId} required />
             <Select label="Department" value={form.departmentId} onChange={(v) => updateField('departmentId', v)} options={departmentOptions} placeholder="Optional" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select label="Status" value={form.status} onChange={(v) => updateField('status', v)} options={STATUS_OPTIONS.filter((o) => o.value !== 'ALL')} />
             <Select label="Priority" value={form.priority} onChange={(v) => updateField('priority', v)} options={PRIORITY_OPTIONS.filter((o) => o.value !== 'ALL')} />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="Start Date" type="date" value={form.startDate} onChange={(v) => updateField('startDate', v)} />
             <Input label="Due Date" type="date" value={form.dueDate} onChange={(v) => updateField('dueDate', v)} error={errors.dueDate} />
           </div>

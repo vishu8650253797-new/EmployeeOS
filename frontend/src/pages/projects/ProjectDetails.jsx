@@ -126,7 +126,7 @@ export default function ProjectDetails() {
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white border border-gray-200 rounded-lg p-6">
             <h3 className="font-semibold text-gray-900 mb-4">Project Information</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm text-gray-500">Status</label>
                 <div className="mt-1"><StatusBadge status={project.status} /></div>

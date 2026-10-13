@@ -126,7 +126,7 @@ export default function TaskDetails() {
                 <p className="text-gray-700 whitespace-pre-wrap">{task.description}</p>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm text-gray-500">Status</label>
                 <div className="mt-1">

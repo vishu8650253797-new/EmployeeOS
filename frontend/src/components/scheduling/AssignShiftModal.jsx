@@ -262,7 +262,7 @@ export default function AssignShiftModal({ open, onClose, onDone }) {
             options={shifts.map((s) => ({ value: s.id, label: `${s.name} (${s.startTime}–${s.endTime})` }))}
           />
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Effective from" required type="date" value={form.effectiveFrom} onChange={(v) => updateField('effectiveFrom', v)} error={errors.effectiveFrom} />
             <Input label="Effective to (optional)" type="date" value={form.effectiveTo} onChange={(v) => updateField('effectiveTo', v)} error={errors.effectiveTo} />
           </div>

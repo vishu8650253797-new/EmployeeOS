@@ -224,7 +224,7 @@ export default function KanbanBoard() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input label="Task Title" value={form.title} onChange={(v) => updateField('title', v)} error={errors.title} required />
           <Input label="Description" value={form.description} onChange={(v) => updateField('description', v)} textarea rows={3} />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select label="Priority" value={form.priority} onChange={(v) => updateField('priority', v)} options={PRIORITY_OPTIONS} />
             <Input label="Due Date" type="date" value={form.dueDate} onChange={(v) => updateField('dueDate', v)} />
           </div>

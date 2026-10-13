@@ -64,7 +64,7 @@ export default function EssLeaveDetail() {
           <Badge tone="neutral" dot={false}>{request.leaveType}</Badge>
         </div>
 
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl border border-line bg-surface p-5 text-[13px] shadow-card">
+        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 rounded-xl border border-line bg-surface p-5 text-[13px] shadow-card">
           <div>
             <dt className="text-xs text-ink-400">From</dt>
             <dd className="mt-0.5 font-medium text-ink-900">{formatDate(request.startDate)}</dd>

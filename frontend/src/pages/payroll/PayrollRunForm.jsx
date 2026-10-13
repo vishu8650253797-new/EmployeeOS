@@ -93,7 +93,7 @@ export default function PayrollRunForm() {
         />
 
         {runType === 'REGULAR' ? (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Select
               label="Year"
               value={year}

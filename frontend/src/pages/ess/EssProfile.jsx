@@ -288,7 +288,7 @@ export default function EssProfile() {
               <Input label="Alternate phone" value={contactForm.alternatePhone} onChange={(v) => updateContactField('alternatePhone', v)} error={contactErrors.alternatePhone} />
               <Input label="Personal email" type="email" value={contactForm.personalEmail} onChange={(v) => updateContactField('personalEmail', v)} error={contactErrors.personalEmail} />
               <Input label="Street address" value={contactForm.address.street} onChange={(v) => updateAddressField('street', v)} />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Input label="City" value={contactForm.address.city} onChange={(v) => updateAddressField('city', v)} />
                 <Input label="State" value={contactForm.address.state} onChange={(v) => updateAddressField('state', v)} />
                 <Input label="Postal code" value={contactForm.address.postalCode} onChange={(v) => updateAddressField('postalCode', v)} />

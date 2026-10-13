@@ -245,7 +245,7 @@ export default function EmployeeScheduling() {
         }
       >
         <form id="edit-schedule-form" onSubmit={handleEditSave} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Effective from" required type="date" value={editForm.effectiveFrom} onChange={(v) => setEditForm((f) => ({ ...f, effectiveFrom: v }))} error={editErrors.effectiveFrom} />
             <Input label="Effective to (optional)" type="date" value={editForm.effectiveTo} onChange={(v) => setEditForm((f) => ({ ...f, effectiveTo: v }))} />
           </div>

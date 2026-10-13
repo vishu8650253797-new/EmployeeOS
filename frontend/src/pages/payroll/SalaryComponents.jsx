@@ -217,11 +217,11 @@ export default function SalaryComponents() {
         }
       >
         <form id="component-form" onSubmit={handleSave} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input label="Code" required value={form.code} onChange={(v) => updateField('code', v)} error={errors.code} uppercase placeholder="BASIC" />
             <Input label="Name" required value={form.name} onChange={(v) => updateField('name', v)} error={errors.name} placeholder="Basic Salary" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Select label="Type" required value={form.type} onChange={(v) => updateField('type', v)} options={COMPONENT_TYPES} />
             <Select label="Calculation method" required value={form.calculationType} onChange={(v) => updateField('calculationType', v)} options={CALCULATION_TYPES} />
           </div>
